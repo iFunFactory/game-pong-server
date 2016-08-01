@@ -1,59 +1,0 @@
-
-‚
- funapi/network/fun_message.proto"^
-
-FunMessage
-sid (	
-msgtype (	
-seq (
-ack (
-urgent (*€€€€
-§
-!funapi/network/ping_message.proto funapi/network/fun_message.proto"1
-FunPingMessage
-	timestamp (
-data (:-
-cs_ping.FunMessage	 (2.FunPingMessage
-Ù
-+funapi/management/maintenance_message.proto funapi/network/fun_message.proto"L
-MaintenanceMessage
-
-date_start (	
-date_end (	
-messages (	::
-pbuf_maintenance.FunMessage (2.MaintenanceMessage
-Õ
-&funapi/service/multicast_message.proto funapi/network/fun_message.proto"K
-FunMulticastChannelListMessage
-channel_name (	
-num_members ("°
-FunMulticastMessage
-channel (	
-join (
-leave (
-bounce (
-sender (	2
-
-error_code (2.FunMulticastMessage.ErrorCode1
-channels (2.FunMulticastChannelListMessage"Z
-	ErrorCode
-EC_ALREADY_JOINED
-EC_ALREADY_LEFT
-EC_FULL_MEMBER
-	EC_CLOSED*€€€€"
-FunChatMessage
-text (	:3
-chat.FunMulticastMessage (2.FunChatMessage:4
-	multicast.FunMessage (2.FunMulticastMessage
-î
-pong_messages.proto funapi/network/fun_message.proto&funapi/service/multicast_message.proto"
-PbufEchoMessage
-msg (	"!
-PbufAnotherMessage
-msg (	"#
-PbufHelloMessage
-message (	:0
-	pbuf_echo.FunMessage (2.PbufEchoMessage:6
-pbuf_another.FunMessage (2.PbufAnotherMessage:;
-
-pbuf_hello.FunMulticastMessage	 (2.PbufHelloMessage

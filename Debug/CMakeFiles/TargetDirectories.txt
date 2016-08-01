@@ -1,5 +1,0 @@
-/home/zeus/projects/pong-source/Debug/CMakeFiles/check_features.dir
-/home/zeus/projects/pong-source/Debug/CMakeFiles/internal_create_launchers.dir
-/home/zeus/projects/pong-source/Debug/CMakeFiles/internal_import_manifest_dirs.dir
-/home/zeus/projects/pong-source/Debug/CMakeFiles/internal_import_resource_dirs.dir
-/home/zeus/projects/pong-source/Debug/src/CMakeFiles/pong.dir
