@@ -86,19 +86,6 @@ Object::Id ArrayRef<Object::Id>::GetAt(size_t index) const {
 
 
 template <>
-Ptr<Character> ArrayRef<Ptr<Character> >::GetAt(size_t index) const {
-  const Object::Id &object_id = owner_->GetArrayElementObject(attribute_name_, index);
-  if (object_id == Object::kNullId) {
-    return Character::kNullPtr;
-  }
-
-  BOOST_ASSERT(lock_type_ != kNoneLock);
-
-  return Character::Fetch(object_id, lock_type_);
-}
-
-
-template <>
 Ptr<User> ArrayRef<Ptr<User> >::GetAt(size_t index) const {
   const Object::Id &object_id = owner_->GetArrayElementObject(attribute_name_, index);
   if (object_id == Object::kNullId) {
@@ -138,16 +125,6 @@ void ArrayRef<string>::SetAt(size_t index, const string &value) {
 template <>
 void ArrayRef<Object::Id>::SetAt(size_t index, const Object::Id &value) {
   owner_->SetArrayElementObject(attribute_name_, index, value);
-}
-
-
-template <>
-void ArrayRef<Ptr<Character> >::SetAt(size_t index, const Ptr<Character> &value) {
-  if (value) {
-    owner_->SetArrayElementObject(attribute_name_, index, value->Id());
-  } else {
-    owner_->SetArrayElementObject(attribute_name_, index, Object::kNullId);
-  }
 }
 
 
@@ -192,16 +169,6 @@ void ArrayRef<Object::Id>::InsertAt(size_t index, const Object::Id &value) {
 
 
 template <>
-void ArrayRef<Ptr<Character> >::InsertAt(size_t index, const Ptr<Character> &value) {
-  if (value) {
-    owner_->InsertArrayElementObject(attribute_name_, index, value->Id());
-  } else {
-    owner_->InsertArrayElementObject(attribute_name_, index, Object::kNullId);
-  }
-}
-
-
-template <>
 void ArrayRef<Ptr<User> >::InsertAt(size_t index, const Ptr<User> &value) {
   if (value) {
     owner_->InsertArrayElementObject(attribute_name_, index, value->Id());
@@ -237,12 +204,6 @@ string ArrayRef<string>::Front() const {
 
 template <>
 Object::Id ArrayRef<Object::Id>::Front() const {
-  return GetAt(0);
-}
-
-
-template <>
-Ptr<Character> ArrayRef<Ptr<Character> >::Front() const {
   return GetAt(0);
 }
 
@@ -284,12 +245,6 @@ Object::Id ArrayRef<Object::Id>::Back() const {
 
 
 template <>
-Ptr<Character> ArrayRef<Ptr<Character> >::Back() const {
-  return GetAt(Size() - 1);
-}
-
-
-template <>
 Ptr<User> ArrayRef<Ptr<User> >::Back() const {
   return GetAt(Size() - 1);
 }
@@ -326,12 +281,6 @@ void ArrayRef<Object::Id>::PushFront(const Object::Id &value) {
 
 
 template <>
-void ArrayRef<Ptr<Character> >::PushFront(const Ptr<Character> &value) {
-  InsertAt(0, value);
-}
-
-
-template <>
 void ArrayRef<Ptr<User> >::PushFront(const Ptr<User> &value) {
   InsertAt(0, value);
 }
@@ -363,12 +312,6 @@ void ArrayRef<string>::PushBack(const string &value) {
 
 template <>
 void ArrayRef<Object::Id>::PushBack(const Object::Id &value) {
-  InsertAt(Size(), value);
-}
-
-
-template <>
-void ArrayRef<Ptr<Character> >::PushBack(const Ptr<Character> &value) {
   InsertAt(Size(), value);
 }
 
@@ -450,380 +393,11 @@ void FetchObjectFromMap(const MapRef<KeyType, Object::Id> &map, bool include_nul
 }  // unnamed namespace
 
 
-struct Character::OpaqueData {
-  OpaqueData() {
-    exp = 0;
-    level = 0;
-    hp = 0;
-    mp = 0;
-  }
-
-  int64_t exp;
-  int64_t level;
-  int64_t hp;
-  int64_t mp;
-};
-
-
 struct User::OpaqueData {
   OpaqueData() {
-    tmp = 0;
   }
 
-  Ptr<Character::OpaqueData> my_character;
-  int64_t tmp;
 };
-
-
-DEFINE_CLASS_PTR(Character);
-
-
-function<bool(const Ptr<Character> &)> Character::MatchByObjectId(const Object::Id &object_id) {
-  function<Object::Id(const Ptr<Character> &)> obj_id_getter = bind(&Character::Id, _1);
-  return bind(&CompareAttribute<Character, Object::Id>, _1, object_id, obj_id_getter, kEqual);
-}
-
-
-function<bool(const Ptr<Character> &)> Character::MatchByName(const string &name, MatchCondition cond) {
-  function<string(const Ptr<Character> &)> attribute_getter = bind(&Character::GetName, _1);
-  return bind(&CompareAttribute<Character, string>, _1, name, attribute_getter, cond);
-}
-
-
-function<bool(const Ptr<Character> &)> Character::MatchByExp(const int64_t &exp, MatchCondition cond) {
-  function<int64_t(const Ptr<Character> &)> attribute_getter = bind(&Character::GetExp, _1);
-  return bind(&CompareAttribute<Character, int64_t>, _1, exp, attribute_getter, cond);
-}
-
-
-function<bool(const Ptr<Character> &)> Character::MatchByLevel(const int64_t &level, MatchCondition cond) {
-  function<int64_t(const Ptr<Character> &)> attribute_getter = bind(&Character::GetLevel, _1);
-  return bind(&CompareAttribute<Character, int64_t>, _1, level, attribute_getter, cond);
-}
-
-
-function<bool(const Ptr<Character> &)> Character::MatchByHp(const int64_t &hp, MatchCondition cond) {
-  function<int64_t(const Ptr<Character> &)> attribute_getter = bind(&Character::GetHp, _1);
-  return bind(&CompareAttribute<Character, int64_t>, _1, hp, attribute_getter, cond);
-}
-
-
-function<bool(const Ptr<Character> &)> Character::MatchByMp(const int64_t &mp, MatchCondition cond) {
-  function<int64_t(const Ptr<Character> &)> attribute_getter = bind(&Character::GetMp, _1);
-  return bind(&CompareAttribute<Character, int64_t>, _1, mp, attribute_getter, cond);
-};
-
-
-void Character::RegisterNameTrigger(const TriggerCondition &condition, const TriggerAction &action) {
-  Object::RegisterAttributeTrigger("Character", "Name", condition, action);
-}
-
-
-void Character::RegisterExpTrigger(const TriggerCondition &condition, const TriggerAction &action) {
-  Object::RegisterAttributeTrigger("Character", "Exp", condition, action);
-}
-
-
-void Character::RegisterLevelTrigger(const TriggerCondition &condition, const TriggerAction &action) {
-  Object::RegisterAttributeTrigger("Character", "Level", condition, action);
-}
-
-
-void Character::RegisterHpTrigger(const TriggerCondition &condition, const TriggerAction &action) {
-  Object::RegisterAttributeTrigger("Character", "Hp", condition, action);
-}
-
-
-void Character::RegisterMpTrigger(const TriggerCondition &condition, const TriggerAction &action) {
-  Object::RegisterAttributeTrigger("Character", "Mp", condition, action);
-}
-
-
-void Character::SelectByName(const Object::ConditionType &cond_type, const string &cond_value, const Object::SelectCallback &callback) {
-  Object::Select("Character", "Name", "", cond_type, AttributeValue(cond_value), callback);
-}
-
-
-void Character::SelectByExp(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback) {
-  Object::Select("Character", "Exp", "", cond_type, AttributeValue(cond_value), callback);
-}
-
-
-void Character::SelectByLevel(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback) {
-  Object::Select("Character", "Level", "", cond_type, AttributeValue(cond_value), callback);
-}
-
-
-void Character::SelectByHp(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback) {
-  Object::Select("Character", "Hp", "", cond_type, AttributeValue(cond_value), callback);
-}
-
-
-void Character::SelectByMp(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback) {
-  Object::Select("Character", "Mp", "", cond_type, AttributeValue(cond_value), callback);
-}
-
-
-Ptr<Character::OpaqueData> Character::CreateOpaqueDataFromJson(const Json &json) {
-  if (not json.IsObject()) {
-    LOG(ERROR) << "not object type";
-    return Ptr<OpaqueData>();
-  }
-
-  Ptr<OpaqueData> data(new OpaqueData);
-
-  if (json.HasAttribute("Exp")) {
-    if (not json["Exp"].IsInteger()) {
-      LOG(ERROR) << "wrong 'Exp' value: type mismatch";
-      return Ptr<OpaqueData>();
-    }
-    data->exp = json["Exp"].GetInteger();
-  }
-  if (json.HasAttribute("Level")) {
-    if (not json["Level"].IsInteger()) {
-      LOG(ERROR) << "wrong 'Level' value: type mismatch";
-      return Ptr<OpaqueData>();
-    }
-    data->level = json["Level"].GetInteger();
-  }
-  if (json.HasAttribute("Hp")) {
-    if (not json["Hp"].IsInteger()) {
-      LOG(ERROR) << "wrong 'Hp' value: type mismatch";
-      return Ptr<OpaqueData>();
-    }
-    data->hp = json["Hp"].GetInteger();
-  }
-  if (json.HasAttribute("Mp")) {
-    if (not json["Mp"].IsInteger()) {
-      LOG(ERROR) << "wrong 'Mp' value: type mismatch";
-      return Ptr<OpaqueData>();
-    }
-    data->mp = json["Mp"].GetInteger();
-  }
-  return data;
-}
-
-
-Ptr<Character> Character::Create(const string &name) {
-  AttributeValueMap key_params;
-  key_params["Name"].reset(new AttributeValue(name));
-
-  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Character"));
-  BOOST_ASSERT(model);
-
-  // try to fetch by same key values.
-  if (FetchByName(name, kReadLock)) {
-    // key value is duplicated.
-    return kNullPtr;
-  }
-
-  Ptr<Object> obj = Object::Create(model, key_params);
-  if (not obj) {
-    // key value is duplicated.
-    return kNullPtr;
-  }
-
-  return Ptr<Character>(new Character(obj));
-}
-
-
-Ptr<Character> Character::Fetch(
-    const Object::Id &id,
-    LockType lock_type) {
-  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Character"));
-  BOOST_ASSERT(model);
-
-  Ptr<Object> obj = Object::Fetch(model, id, lock_type);
-  if (not obj)
-    return kNullPtr;
-
-  return Ptr<Character>(new Character(obj));
-}
-
-
-void Character::Fetch(
-    const std::vector<Object::Id> &ids,
-    std::vector<std::pair<Object::Id, Ptr<Character> > > *result,
-    LockType lock_type) {
-  BOOST_ASSERT(result);
-  BOOST_ASSERT(result->empty());
-
-  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Character"));
-  BOOST_ASSERT(model);
-
-  std::vector<std::pair<Object::Id, Ptr<Object> > > objs;
-  objs.reserve(ids.size());
-  Object::Fetch(model, ids, lock_type, &objs);
-  BOOST_ASSERT(objs.size() == ids.size());
-
-  result->reserve(ids.size());
-  for (size_t i = 0; i < objs.size(); ++i) {
-    Ptr<Character> wrapped_obj;
-    if (objs[i].second)
-      wrapped_obj.reset(new Character(objs[i].second));
-    result->push_back(std::make_pair(objs[i].first, wrapped_obj));
-  }
-
-  BOOST_ASSERT(result->size() == ids.size());
-}
-
-
-Ptr<Character> Character::FetchByName(const string &value, LockType lock_type) {
-  Ptr<AttributeValue> key_value(new AttributeValue(value));
-  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Character"));
-  BOOST_ASSERT(model);
-
-  Ptr<Object> obj = Object::Fetch(model, "Name",  key_value, lock_type);
-  if (not obj)
-    return kNullPtr;
-
-  return Ptr<Character>(new Character(obj));
-}
-
-
-void Character::FetchByName(
-    const std::vector<string> &values,
-    std::vector<std::pair<string, Ptr<Character> > > *result,
-    LockType lock_type) {
-  BOOST_ASSERT(result);
-  BOOST_ASSERT(result->empty());
-
-  std::vector<Ptr<AttributeValue> > key_values;
-  key_values.reserve(values.size());
-  for (size_t i = 0; i < values.size(); ++i) {
-    key_values.push_back(Ptr<AttributeValue>(new AttributeValue(values[i])));
-  }
-
-  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Character"));
-  BOOST_ASSERT(model);
-
-  std::vector<std::pair<Ptr<AttributeValue>, Ptr<Object> > > objs;
-  Object::Fetch(model, "Name", key_values, lock_type, &objs);
-  BOOST_ASSERT(objs.size() == key_values.size());
-
-  result->reserve(values.size());
-  for (size_t i = 0; i < objs.size(); ++i) {
-    Ptr<Character> wrapped_obj;
-    if (objs[i].second)
-      wrapped_obj.reset(new Character(objs[i].second));
-    BOOST_ASSERT(AttributeValue(values[i]) == *objs[i].first);
-    result->push_back(std::make_pair(values[i], wrapped_obj));
-  }
-
-  BOOST_ASSERT(result->size() == values.size());
-}
-
-
-void Character::FetchRandomly(
-    size_t count, std::vector<Ptr<Character> > *result,
-    LockType lock_type) {
-  const Ptr<const ObjectModel> &model(ObjectModel::FindModel("Character"));
-
-  std::vector<Ptr<Object> > raw_objects;
-  Object::FetchRandomly(model, count, lock_type, &raw_objects);
-  for (size_t i = 0; i < raw_objects.size(); ++i) {
-    BOOST_ASSERT(raw_objects[i]);
-    result->push_back(Ptr<Character>(new Character(raw_objects[i])));
-  }
-}
-
-
-bool Character::IsNull() const {
-  return ObjectProxy::IsNull();
-}
-
-
-bool Character::IsFresh() const {
-  return ObjectProxy::IsFresh();
-}
-
-
-bool Character::Refresh() {
-  return ObjectProxy::Refresh();
-}
-
-
-void Character::ToJson(Json *output) const {
-  if (output) {
-    DumpJson(*this, output);
-  }
-}
-
-
-const Object::Id &Character::Id() const {
-  BOOST_ASSERT(object());
-  return object()->id();
-}
-
-
-void Character::Delete() {
-  object()->Delete();
-  BOOST_ASSERT(IsNull());
-}
-
-
-bool Character::PopulateFrom(const Ptr<OpaqueData> &opaque_data) {
-  SetExp(opaque_data->exp);
-  SetLevel(opaque_data->level);
-  SetHp(opaque_data->hp);
-  SetMp(opaque_data->mp);
-  return true;
-}
-
-
-string Character::GetName() const {
-  BOOST_ASSERT(object());
-  return object()->GetString("Name");
-}
-
-
-void Character::SetName(const string &value) {
-  BOOST_ASSERT(object());object()->SetString("Name", value);}
-
-
-int64_t Character::GetExp() const {
-  BOOST_ASSERT(object());
-  return object()->GetInteger("Exp");
-}
-
-
-void Character::SetExp(const int64_t &value) {
-  BOOST_ASSERT(object());object()->SetInteger("Exp", value);}
-
-
-int64_t Character::GetLevel() const {
-  BOOST_ASSERT(object());
-  return object()->GetInteger("Level");
-}
-
-
-void Character::SetLevel(const int64_t &value) {
-  BOOST_ASSERT(object());object()->SetInteger("Level", value);}
-
-
-int64_t Character::GetHp() const {
-  BOOST_ASSERT(object());
-  return object()->GetInteger("Hp");
-}
-
-
-void Character::SetHp(const int64_t &value) {
-  BOOST_ASSERT(object());object()->SetInteger("Hp", value);}
-
-
-int64_t Character::GetMp() const {
-  BOOST_ASSERT(object());
-  return object()->GetInteger("Mp");
-}
-
-
-void Character::SetMp(const int64_t &value) {
-  BOOST_ASSERT(object());object()->SetInteger("Mp", value);}
-
-
-Character::Character(const Ptr<Object> &object)
-    : ObjectProxy(object) {
-}
 
 
 DEFINE_CLASS_PTR(User);
@@ -838,18 +412,6 @@ function<bool(const Ptr<User> &)> User::MatchByObjectId(const Object::Id &object
 function<bool(const Ptr<User> &)> User::MatchById(const string &id, MatchCondition cond) {
   function<string(const Ptr<User> &)> attribute_getter = bind(&User::GetId, _1);
   return bind(&CompareAttribute<User, string>, _1, id, attribute_getter, cond);
-}
-
-
-function<bool(const Ptr<User> &)> User::MatchByMyCharacter(const function<bool(const Ptr<Character> &)> &match) {
-  function<Ptr<Character>(const Ptr<User> &)> attribute_getter = bind(&User::GetMyCharacter, _1);
-  return bind(&CompareAttribute2<User, Ptr<Character> >, _1, match, attribute_getter);
-}
-
-
-function<bool(const Ptr<User> &)> User::MatchBytmp(const int64_t &tmp, MatchCondition cond) {
-  function<int64_t(const Ptr<User> &)> attribute_getter = bind(&User::Gettmp, _1);
-  return bind(&CompareAttribute<User, int64_t>, _1, tmp, attribute_getter, cond);
 };
 
 
@@ -858,28 +420,8 @@ void User::RegisterIdTrigger(const TriggerCondition &condition, const TriggerAct
 }
 
 
-void User::RegisterMyCharacterTrigger(const TriggerCondition &condition, const TriggerAction &action) {
-  Object::RegisterAttributeTrigger("User", "MyCharacter", condition, action);
-}
-
-
-void User::RegistertmpTrigger(const TriggerCondition &condition, const TriggerAction &action) {
-  Object::RegisterAttributeTrigger("User", "tmp", condition, action);
-}
-
-
 void User::SelectById(const Object::ConditionType &cond_type, const string &cond_value, const Object::SelectCallback &callback) {
   Object::Select("User", "Id", "", cond_type, AttributeValue(cond_value), callback);
-}
-
-
-void User::SelectByMyCharacter(const Object::ConditionType &cond_type, const Ptr<Character> &cond_value, const Object::SelectCallback &callback) {
-  Object::Select("User", "MyCharacter", "Character", cond_type, AttributeValue(cond_value->Id()), callback);
-}
-
-
-void User::SelectBytmp(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback) {
-  Object::Select("User", "tmp", "", cond_type, AttributeValue(cond_value), callback);
 }
 
 
@@ -891,22 +433,6 @@ Ptr<User::OpaqueData> User::CreateOpaqueDataFromJson(const Json &json) {
 
   Ptr<OpaqueData> data(new OpaqueData);
 
-  if (json.HasAttribute("MyCharacter")) {
-    if (not json["MyCharacter"].IsObject()) {
-      LOG(ERROR) << "wrong 'MyCharacter' value: type mismatch";
-      return Ptr<OpaqueData>();
-    }
-    data->my_character = Character::CreateOpaqueDataFromJson(json["MyCharacter"]);
-    if (not data->my_character)
-      return Ptr<OpaqueData>();
-  }
-  if (json.HasAttribute("tmp")) {
-    if (not json["tmp"].IsInteger()) {
-      LOG(ERROR) << "wrong 'tmp' value: type mismatch";
-      return Ptr<OpaqueData>();
-    }
-    data->tmp = json["tmp"].GetInteger();
-  }
   return data;
 }
 
@@ -1070,18 +596,6 @@ void User::Delete() {
 
 
 bool User::PopulateFrom(const Ptr<OpaqueData> &opaque_data) {
-  if (opaque_data->my_character) {
-    Ptr<Character> my_character = GetMyCharacter();
-    if (not my_character) {
-      LOG(ERROR) << "failed to create 'MyCharacter'. 'Character' has key attribute.";
-      return false;
-    }
-    BOOST_ASSERT(my_character);
-
-    if (not my_character->PopulateFrom(opaque_data->my_character))
-      return false;
-  }
-  Settmp(opaque_data->tmp);
   return true;
 }
 
@@ -1096,82 +610,8 @@ void User::SetId(const string &value) {
   BOOST_ASSERT(object());object()->SetString("Id", value);}
 
 
-Ptr<Character> User::GetMyCharacter() const {
-  BOOST_ASSERT(object());
-  Object::Id attr_obj_id = object()->GetObject("MyCharacter");
-  if (attr_obj_id == Object::kNullId)
-    return Character::kNullPtr;
-  Ptr<Character> attr_obj = Character::Fetch(attr_obj_id, object()->lock_type());
-  if (not attr_obj) {
-    LOG(WARNING) << "User(" << object()->id() << ")"
-                 << " - MyCharacter(" << attr_obj_id << ") not found";
-  }
-  return attr_obj;
-}
-
-
-void User::SetMyCharacter(const Ptr<Character> &value) {
-  BOOST_ASSERT(object());
-  if (value)
-    object()->SetObject("MyCharacter", value->Id(), false);
-  else
-    object()->SetObject("MyCharacter", Object::kNullId, false);
-}
-
-
-void User::DeleteMyCharacter(bool delete_object) {
-  BOOST_ASSERT(object());
-  object()->SetObject("MyCharacter", Object::kNullId, delete_object);
-}
-
-
-int64_t User::Gettmp() const {
-  BOOST_ASSERT(object());
-  return object()->GetInteger("tmp");
-}
-
-
-void User::Settmp(const int64_t &value) {
-  BOOST_ASSERT(object());object()->SetInteger("tmp", value);}
-
-
 User::User(const Ptr<Object> &object)
     : ObjectProxy(object) {
-}
-
-
-void RegisterCharacterModel() {
-  AttributeModelVector attrs;
-
-  attrs.push_back(Ptr<const AttributeModel>(
-      new AttributeModel(
-          "Name", fun::AttributeModel::kString, true , false, false, false)));
-
-  attrs.push_back(Ptr<const AttributeModel>(
-      new AttributeModel(
-          "Exp", fun::AttributeModel::kInteger, false, false, false, false)));
-
-  attrs.push_back(Ptr<const AttributeModel>(
-      new AttributeModel(
-          "Level", fun::AttributeModel::kInteger, false, false, false, false)));
-
-  attrs.push_back(Ptr<const AttributeModel>(
-      new AttributeModel(
-          "Hp", fun::AttributeModel::kInteger, false, false, false, false)));
-
-  attrs.push_back(Ptr<const AttributeModel>(
-      new AttributeModel(
-          "Mp", fun::AttributeModel::kInteger, false, false, false, false)));
-
-  Ptr<const ObjectModel> model(new ObjectModel("Character", attrs));
-  ObjectModel::AddModel(model);
-
-  // Regiters counter.
-  UpdateCounter(
-      "funapi_object_model",
-      "Character",
-      "The number of active Character objects in memory",
-      0);
 }
 
 
@@ -1181,14 +621,6 @@ void RegisterUserModel() {
   attrs.push_back(Ptr<const AttributeModel>(
       new AttributeModel(
           "Id", fun::AttributeModel::kString, true , false, false, false)));
-
-  attrs.push_back(Ptr<const AttributeModel>(
-      new AttributeModel(
-          "MyCharacter", "Character", false, false, false, false)));
-
-  attrs.push_back(Ptr<const AttributeModel>(
-      new AttributeModel(
-          "tmp", fun::AttributeModel::kInteger, false, false, false, false)));
 
   Ptr<const ObjectModel> model(new ObjectModel("User", attrs));
   ObjectModel::AddModel(model);
@@ -1203,32 +635,9 @@ void RegisterUserModel() {
 
 
 void ObjectModelInit() {
-  RegisterCharacterModel();
   RegisterUserModel();
 
   Object::ObjectModelInit();
-}
-
-
-// Character dumper
-void DumpJson(const Character &obj, Json *dest) {
-  if (not dest) {
-    return;
-  }
-
-  Json &out = *dest;
-  out["Name"].SetString(obj.GetName());
-  out["Exp"].SetInteger(obj.GetExp());
-  out["Level"].SetInteger(obj.GetLevel());
-  out["Hp"].SetInteger(obj.GetHp());
-  out["Mp"].SetInteger(obj.GetMp());
-}
-
-
-void DumpJson(const Ptr<const Character> &obj, Json *dest) {
-  if (obj) {
-    DumpJson(*obj, dest);
-  }
 }
 
 
@@ -1240,17 +649,6 @@ void DumpJson(const User &obj, Json *dest) {
 
   Json &out = *dest;
   out["Id"].SetString(obj.GetId());
-  // NOTE: MyCharacter (object)
-  {
-    Json &out_obj = out["MyCharacter"];
-    out_obj.SetObject();
-    if (obj.GetMyCharacter()) {
-      DumpJson(*obj.GetMyCharacter(), &out_obj);
-    } else {
-      out_obj.SetNull();
-    }
-  }
-  out["tmp"].SetInteger(obj.Gettmp());
 }
 
 
@@ -1277,9 +675,8 @@ static CsApiHandler *g_handler = NULL;
 
 
 CsApiHandler::CsApiHandler() : schemas_(boost::assign::map_list_of
-    ("Character", "{\"Character\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"Name\", \"key\": true}, {\"type\": \"integer\", \"name\": \"Exp\"}, {\"type\": \"integer\", \"name\": \"Level\"}, {\"type\": \"integer\", \"name\": \"Hp\"}, {\"type\": \"integer\", \"name\": \"Mp\"}], \"type\": \"object\"}}")
-    ("User", "{\"User\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"Id\", \"key\": true}, {\"type\": \"object\", \"name\": \"MyCharacter\", \"schema\": \"Character\"}, {\"type\": \"integer\", \"name\": \"tmp\"}], \"type\": \"object\"}}").convert_to_container<boost::unordered_map<string, string> >()),
-  getters_(boost::assign::map_list_of("Character", FetchCharacter)("User", FetchUser).convert_to_container<CsApiHandler::getter_map>())
+    ("User", "{\"User\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"Id\", \"key\": true}], \"type\": \"object\"}}").convert_to_container<boost::unordered_map<string, string> >()),
+  getters_(boost::assign::map_list_of("User", FetchUser).convert_to_container<CsApiHandler::getter_map>())
 {
 }
 
@@ -1411,16 +808,6 @@ bool CsApiHandler::GetData(const string& schema_type, const string &key,
 
 
 
-
-// Character
-bool FetchCharacter(const std::string &key, Json &out) {
-  Ptr<Character> obj = Character::FetchByName(key);
-
-  if (!obj)
-    return false;
-  DumpJson(*obj, &out);
-  return true;
-}
 
 // User
 bool FetchUser(const std::string &key, Json &out) {
@@ -1671,11 +1058,6 @@ bool InitializeCustomerServiceAPI(CsApiHandler *handler) {
   ApiService::RegisterHandler(http::kGet,
                               boost::regex(pattern_history),
                               HandleAccountGetBillingHistory);
-
-  ApiService::RegisterHandler(
-      http::kGet,
-      boost::regex("/v1/data/Character/(?<key>[^/]+)"),
-      boost::bind(HandleDataGet, _1, _2, _3, std::string("Character")));
 
   ApiService::RegisterHandler(
       http::kGet,

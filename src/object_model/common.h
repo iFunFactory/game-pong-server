@@ -21,7 +21,6 @@
 
 namespace pong {
 
-class Character;
 class User;
 
 
@@ -387,7 +386,6 @@ void ObjectModelInit();
 namespace cs_api {
 
 // read database object as JSON document
-bool FetchCharacter(const std::string &key, Json &out);
 bool FetchUser(const std::string &key, Json &out);
 
 

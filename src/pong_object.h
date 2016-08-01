@@ -10,7 +10,6 @@
 #define SRC_PONG_OBJECT_H_
 
 #include "object_model/common.h"
-#include "object_model/character.h"
 #include "object_model/user.h"
 
 #endif  // SRC_PONG_OBJECT_H_

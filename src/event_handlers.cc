@@ -1,5 +1,3 @@
-// PLEASE ADD YOUR EVENT HANDLER DECLARATIONS HERE.
-
 #include "event_handlers.h"
 
 #include <funapi.h>
@@ -11,14 +9,12 @@
 
 namespace pong {
 
-////////////////////////////////////////////////////////////////////////////////
-// Session open/close handlers
-////////////////////////////////////////////////////////////////////////////////
-
+	// session opened
 	void OnSessionOpened(const Ptr<Session> &session) {
 		logger::SessionOpened(to_string(session->id()), WallClock::Now());
 	}
 
+	// session closed
 	void OnSessionClosed(const Ptr<Session> &session, SessionCloseReason reason) {
 		logger::SessionClosed(to_string(session->id()), WallClock::Now());
 
@@ -35,10 +31,12 @@ namespace pong {
 		LOG(INFO) << "OnSessionClosed : " + to_string(session->id());
 	}
 	
+	// matching cancelled by client off
 	void MatchingCancelledByTransportDetaching(const string &id, MatchmakingClient::CancelResult result) {
 		LOG(INFO) << "MatchingCancelledByTransportDetaching : " + id;
 	}
 
+	// transport detached
 	void OnTransportTcpDetached(const Ptr<Session> &session) {
 		LOG(INFO) << "OnTransportTcpDetached : " + to_string(session->id())+" : " + AccountManager::FindLocalAccount(session);
 		string opponentId;
@@ -64,12 +62,9 @@ namespace pong {
 		session->Close();
 	}
 
-	////////////////////////////////////////////////////////////////////////////////
-	// Client message handlers.
-	//
-	// (Just for your reference. Please replace with your own.)
-	////////////////////////////////////////////////////////////////////////////////
-
+	// message handlers /////////////////////////
+	
+	// login
 	void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
 		string id = message["id"].GetString();
 		Json response;
@@ -81,15 +76,16 @@ namespace pong {
 		}
 		else
 		{
+			// 로그인 실패
 			response["result"] = "nop";
 			LOG(INFO) << "login failed! : " + id;
-			// 일단은 그냥 기존 접속을 끊어준다
+			// 중복 아이디 정책: 동일한 아이디가 있다면 끊어주자
 			AccountManager::SetLoggedOut(id);
 		}
 		session->SendMessage("login", response);
 	}
 	
-	// 매치가 성사되면 호출됩니다.
+	// matched
 	void OnMatched(const string &id, const MatchmakingClient::Match &match, MatchmakingClient::MatchResult result)
 	{
 		Ptr<Session> session = AccountManager::FindLocalSession(id);
@@ -97,6 +93,7 @@ namespace pong {
 			return;
 		Json response;
 		if (result == MatchmakingClient::kMRSuccess) {
+			// 매칭 성공
 			response["result"] = "Success";
 			response["A"] = match.context["A"];
 			response["B"] = match.context["B"];
@@ -127,6 +124,7 @@ namespace pong {
 		session->SendMessage("match", response, kDefaultEncryption, kTcp);
 	}
 	
+	// matching cancelled by timeout
 	void MatchingCancelledByClientTimeout(const string &id, MatchmakingClient::CancelResult result) {
 		LOG(INFO) << "MatchingCancelledByClientTimeout : " + id;
 	
@@ -140,6 +138,7 @@ namespace pong {
 		session->SendMessage("match", response, kDefaultEncryption, kTcp);
 	}
 
+	// matching requested
 	void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
 		Json context;
 		context["dummy"] = 1;
@@ -252,10 +251,8 @@ namespace pong {
 		session->SendMessage("result", message);
 	}
 
-	////////////////////////////////////////////////////////////////////////////////
-	// Extend the function below with your handlers.
-	////////////////////////////////////////////////////////////////////////////////
 
+	// regist handlers
 	void RegisterEventHandlers() {
 	  /*
 	   * Registers handlers for session close/open events.
@@ -273,13 +270,7 @@ namespace pong {
 		   * Feel free to delete them and replace with your own.
 		   */
 		{
-		  // 1. Registering a JSON message named "login" with its JSON schema.
-		  //    With json schema, Engine validates input messages in JSON.
-		  //    before entering a handler.
-		  //    You can specify a JSON schema like below, or you can also use
-		  //    auxiliary files in src/json_protocols directory.
-			JsonSchema login_msg(JsonSchema::kObject,
-				JsonSchema("id", JsonSchema::kString, true));
+			JsonSchema login_msg(JsonSchema::kObject, JsonSchema("id", JsonSchema::kString, true));
 			HandlerRegistry::Register("login", OnAccountLogin, login_msg);
 			HandlerRegistry::Register("match", OnMatchmakingRequested);
 			HandlerRegistry::Register("ready", OnReadySignal);

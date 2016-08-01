@@ -23,7 +23,6 @@
 
 namespace pong {
 
-class Character;
 
 
 class User : public ObjectProxy {
@@ -34,19 +33,13 @@ class User : public ObjectProxy {
 
   static function<bool(const Ptr<User> &)> MatchByObjectId(const Object::Id &object_id);
   static function<bool(const Ptr<User> &)> MatchById(const string &id, MatchCondition cond = kEqual);
-  static function<bool(const Ptr<User> &)> MatchByMyCharacter(const function<bool(const Ptr<Character> &)> &match);
-  static function<bool(const Ptr<User> &)> MatchBytmp(const int64_t &tmp, MatchCondition cond = kEqual);
 
   typedef function<bool(const Object::Id &/*object id*/)> TriggerCondition;
   typedef function<void(const Object::Id &/*object id*/)> TriggerAction;
 
   static void RegisterIdTrigger(const TriggerCondition &condition, const TriggerAction &action);
-  static void RegisterMyCharacterTrigger(const TriggerCondition &condition, const TriggerAction &action);
-  static void RegistertmpTrigger(const TriggerCondition &condition, const TriggerAction &action);
 
   static void SelectById(const Object::ConditionType &cond_type, const string &cond_value, const Object::SelectCallback &callback);
-  static void SelectByMyCharacter(const Object::ConditionType &cond_type, const Ptr<Character> &cond_value, const Object::SelectCallback &callback);
-  static void SelectBytmp(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback);
 
   static Ptr<OpaqueData> CreateOpaqueDataFromJson(const Json &json);
 
@@ -92,15 +85,6 @@ class User : public ObjectProxy {
   // Getter/Setter for 'Id' attribute
   string GetId() const;
   void SetId(const string &value);
-
-  // Getter/Setter for 'MyCharacter' attribute
-  Ptr<Character> GetMyCharacter() const;
-  void SetMyCharacter(const Ptr<Character> &value);
-  void DeleteMyCharacter(bool delete_object = true);
-
-  // Getter/Setter for 'tmp' attribute
-  int64_t Gettmp() const;
-  void Settmp(const int64_t &value);
 
  private:
   User(const Ptr<Object> &object);
