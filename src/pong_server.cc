@@ -1,5 +1,3 @@
-// PLEASE ADD YOUR EVENT HANDLER DECLARATIONS HERE.
-
 #include <boost/bind.hpp>
 #include <funapi.h>
 #include <gflags/gflags.h>
@@ -7,15 +5,7 @@
 #include "event_handlers.h"
 #include "pong_object.h"
 
-
-// You can differentiate game server flavors.
 DECLARE_string(app_flavor);
-
-// Adding gflags. In your code, you can refer to them as FLAGS_example_arg3, ...
-DEFINE_string(example_arg3, "default_val", "example flag");
-DEFINE_int32(example_arg4, 100, "example flag");
-DEFINE_bool(example_arg5, false, "example flag");
-
 
 namespace {
 
@@ -26,79 +16,44 @@ class PongServer : public Component {
   static bool Install(const ArgumentMap &arguments) {
     LOG(INFO) << "Built using Engine version: " << FUNAPI_BUILD_IDENTIFIER;
 
-    // Kickstarts the Engine's ORM.
-    // Do not touch this, unless you fully understand what you are doing.
+	// ì´ˆê¸°í™” ë¶€ë¶„ìž…ë‹ˆë‹¤.
     pong::ObjectModelInit();
-
-    /*
-     * Parameters specified in the "arguments" section in your MANIFEST.json
-     * will be passed in the variable "arguments".
-     * So, you can give configuration data to your game server.
-     *
-     * Example:
-     *
-     * We have in MANIFEST.json "example_arg1" and "example_arg2" that
-     * have a string value and an integer value, respectively.
-     * So, you can access the arguments like below:
-     */
-    string arg1 = arguments.FindStringArgument("example_arg1");
-    LOG(INFO) << "example_arg1: " << arg1;
-
-    int64_t arg2 = arguments.FindIntegerArgument("example_arg2");
-    LOG(INFO) << "example_arg2: " << arg2;
-
-     // You can override gflag like this: ./pong-local --example_arg3=hahaha
-    LOG(INFO) << "example_arg3: " << FLAGS_example_arg3;
-
-    /*
-     * Registers various handlers.
-     * You may be interesed in this function and handlers in it.
-     * Please see "event_handlers.cc"
-     */
     pong::RegisterEventHandlers();
 
-	// MatchmakingServer ¿ªÇÒÀ» ÇÏ´Â ¼­¹ö¿¡¼­ Start ÇÔ¼ö¸¦ È£ÃâÇÏ¿©
-	// MatchmakingServer ¸¦ ½ÃÀÛÇÕ´Ï´Ù. ´ÙÀ½ 4 °³ÀÇ ÇÔ¼ö¸¦ ÀÎÀÚ·Î Àü´ÞÇÕ´Ï´Ù.
+	// MatchmakingServerë¥¼ ì‹œìž‘í•©ë‹ˆë‹¤.
 	MatchmakingServer::Start(CheckMatch, CheckCompletion, OnJoined, OnLeft);
 
     return true;
   }
 
-  // player °¡ match ¿¡ Âü¿©ÇØµµ µÇ´ÂÁö °Ë»çÇÕ´Ï´Ù.
-  static bool CheckMatch(const MatchmakingServer::Player &player, const MatchmakingServer::Match &match)
-  {
-	  LOG(INFO) << "CheckMatch " + player.id;
+  // player ê°€ match ì— ì°¸ì—¬í•´ë„ ë˜ëŠ”ì§€ ê²€ì‚¬í•©ë‹ˆë‹¤.
+  static bool CheckMatch(const MatchmakingServer::Player &player, const MatchmakingServer::Match &match) {
+	  // ì¡°ê±´ì—†ì´ ë°”ë¡œ ë§¤ì¹­í•©ë‹ˆë‹¤.
 	  return true;
   }
 
-  // JoinMatch ÇÔ¼ö°¡ ºÒ¸° ÈÄ È£ÃâµË´Ï´Ù. ÇØ´ç ¸ÅÄ¡°¡ ¼º»ç µÇ¾ú´ÂÁö ÆÇ´ÜÇÕ´Ï´Ù.
-  static MatchmakingServer::MatchState CheckCompletion(const MatchmakingServer::Match &match)
-  {
-	  LOG(INFO) << "CheckCompletion " + match.players.size();
+  // JoinMatch í•¨ìˆ˜ê°€ ë¶ˆë¦° í›„ í˜¸ì¶œë©ë‹ˆë‹¤. í•´ë‹¹ ë§¤ì¹˜ê°€ ì„±ì‚¬ ë˜ì—ˆëŠ”ì§€ íŒë‹¨í•©ë‹ˆë‹¤.
+  static MatchmakingServer::MatchState CheckCompletion(const MatchmakingServer::Match &match) {
+	  LOG(INFO) << "CheckCompletion " << match.players.size();
 	  if (match.players.size() == 2)
 		  return MatchmakingServer::kMatchComplete;
 	  else
 		  return MatchmakingServer::kMatchNeedMorePlayer;
   }
 
-  // CheckMatch ÇÔ¼ö¿¡¼­ Á¶°Ç¿¡ ¸¸Á·ÇÏ¿© true °¡ ¹ÝÈ¯µÇ¸é ÀÌ ÇÔ¼ö°¡ È£ÃâµË´Ï´Ù. ÀÌÁ¦ ÇÃ·¹ÀÌ¾î´Â match ¿¡ Âü¿©ÇÏ°Ô µÇ¾ú½À´Ï´Ù.
-  // match ÀÇ context ¸¦ ÀúÀåÇÒ ¼ö ÀÖ½À´Ï´Ù.)
-  static void OnJoined(const MatchmakingServer::Player &player, MatchmakingServer::Match *match)
-  {
+  // CheckMatch í•¨ìˆ˜ì—ì„œ ì¡°ê±´ì— ë§Œì¡±í•˜ì—¬ true ê°€ ë°˜í™˜ë˜ë©´ ì´ í•¨ìˆ˜ê°€ í˜¸ì¶œë©ë‹ˆë‹¤. ì´ì œ í”Œë ˆì´ì–´ëŠ” match ì— ì°¸ì—¬í•˜ê²Œ ë˜ì—ˆìŠµë‹ˆë‹¤.
+  static void OnJoined(const MatchmakingServer::Player &player, MatchmakingServer::Match *match) {
 	  LOG(INFO) << "OnJoined " + player.id;
-	  if (match->context.IsNull())
-	  {
+	  if (match->context.IsNull()) {
 		  match->context.SetObject();
 		  match->context["A"] = player.id;
 	  }
-	  else
-	  {
+	  else {
 		  match->context["B"] = player.id;
 	  }
   }
 
-  static void OnLeft(const MatchmakingServer::Player &player, MatchmakingServer::Match *match)
-  {
+  static void OnLeft(const MatchmakingServer::Player &player, MatchmakingServer::Match *match) {
   }
 
   static bool Start() {
@@ -111,6 +66,5 @@ class PongServer : public Component {
 };
 
 }  // unnamed namespace
-
 
 REGISTER_STARTABLE_COMPONENT(PongServer, PongServer)

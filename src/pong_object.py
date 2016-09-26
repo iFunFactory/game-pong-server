@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# Copyright (C) 2013-2015 iFunFactory Inc. All Rights Reserved.
+# vim: fileencoding=utf-8 tabstop=2 softtabstop=2 shiftwidth=2 expandtab
+# Copyright (C) 2013-2016 iFunFactory Inc. All Rights Reserved.
 #
 # This work is confidential and proprietary to iFunFactory Inc. and
 # must not be used, disclosed, copied, or distributed without the prior

@@ -1,4 +1,4 @@
-// Copyright (C) 2013-2015 iFunFactory Inc. All Rights Reserved.
+// Copyright (C) 2013-2016 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -589,6 +589,11 @@ const Object::Id &User::Id() const {
 }
 
 
+void User::WriteImmediately() {
+  object()->WriteImmediately();
+}
+
+
 void User::Delete() {
   object()->Delete();
   BOOST_ASSERT(IsNull());
@@ -617,10 +622,11 @@ User::User(const Ptr<Object> &object)
 
 void RegisterUserModel() {
   AttributeModelVector attrs;
-
+  // not attribute.object
   attrs.push_back(Ptr<const AttributeModel>(
       new AttributeModel(
-          "Id", fun::AttributeModel::kString, true , false, false, false)));
+          // not attribute.map
+          "Id", fun::AttributeModel::kString, 0, true, false, false, false, false)));
 
   Ptr<const ObjectModel> model(new ObjectModel("User", attrs));
   ObjectModel::AddModel(model);

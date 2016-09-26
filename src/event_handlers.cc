@@ -6,7 +6,6 @@
 #include "pong_loggers.h"
 #include "pong_messages.pb.h"
 
-
 namespace pong {
 
 	// session opened
@@ -17,33 +16,22 @@ namespace pong {
 	// session closed
 	void OnSessionClosed(const Ptr<Session> &session, SessionCloseReason reason) {
 		logger::SessionClosed(to_string(session->id()), WallClock::Now());
-
-		if (reason == kClosedForServerDid) {
-		  // Server has called session->Close().
-		}
-		else if (reason == kClosedForIdle) {
-		  // The session has been idle for long time.
-		}
-		else if (reason == kClosedForUnknownSessionId) {
-		  // The session was invalid.
-		}
-
-		LOG(INFO) << "OnSessionClosed : " + to_string(session->id());
 	}
 	
-	// matching cancelled by client off
+	// 매치메이킹 중 클라이언트와의 연결이 끊어졌을 때의 콜백입니다.
 	void MatchingCancelledByTransportDetaching(const string &id, MatchmakingClient::CancelResult result) {
-		LOG(INFO) << "MatchingCancelledByTransportDetaching : " + id;
+		LOG(INFO) << "MatchingCancelledByTransportDetaching : " << id;
 	}
 
 	// transport detached
 	void OnTransportTcpDetached(const Ptr<Session> &session) {
-		LOG(INFO) << "OnTransportTcpDetached : " + to_string(session->id())+" : " + AccountManager::FindLocalAccount(session);
+		LOG(INFO) << "OnTransportTcpDetached : " << to_string(session->id()) << " : " << AccountManager::FindLocalAccount(session);
+		// 대전 상대가 있는지 확인합니다.
 		string opponentId;
 		session->GetFromContext("opponent", &opponentId);
 		if (!opponentId.empty())
 		{
-			LOG(INFO) << "opponentId : " << opponentId;
+			// 대전 상대가 있는 경우, 상대에게 승리 메세지를 보냅니다.
 			Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
 			if (opponentSession && opponentSession->IsTransportAttached())
 			{
@@ -52,48 +40,50 @@ namespace pong {
 				opponentSession->SendMessage("result", message, kDefaultEncryption, kTcp);
 			}
 		}
+		// 매치메이킹이 진행중인지 확인합니다.
 		string matchingContext;
 		session->GetFromContext("matching", &matchingContext);
 		if (!matchingContext.empty() && matchingContext == "doing")
 		{
+			// 매치메이킹이 진행 중인 경우, 취소합니다.
 			MatchmakingClient::CancelMatchmaking(0, AccountManager::FindLocalAccount(session), MatchingCancelledByTransportDetaching);
 		}
+		// 로그아웃하고 세션을 종료합니다.
 		AccountManager::SetLoggedOut(AccountManager::FindLocalAccount(session));
 		session->Close();
 	}
 
-	// message handlers /////////////////////////
+	// 메세지 핸들러
 	
-	// login
+	// 로그인 요청
 	void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
+		// 각 플랫폼 별 device id를 사용하여 중복체크만 합니다.
 		string id = message["id"].GetString();
 		Json response;
-		if (AccountManager::CheckAndSetLoggedIn(id, session))
-		{
+		if (AccountManager::CheckAndSetLoggedIn(id, session)) {
 			logger::PlayerLoggedIn(to_string(session->id()), id, WallClock::Now());
 			response["result"] = "ok";
-			LOG(INFO) << "login success : " + id;
+			LOG(INFO) << "login succeed : " << id;
 		}
-		else
-		{
+		else {
 			// 로그인 실패
 			response["result"] = "nop";
-			LOG(INFO) << "login failed! : " + id;
-			// 중복 아이디 정책: 동일한 아이디가 있다면 끊어주자
+			LOG(WARNING) << "login failed : " << id;
+			// 중복 아이디 정책: 동일한 아이디가 있다면 이전 로그인을 취소합니다.
 			AccountManager::SetLoggedOut(id);
+			// TODO: 이전 세션 처리가 필요합니다.
 		}
 		session->SendMessage("login", response);
 	}
 	
 	// matched
-	void OnMatched(const string &id, const MatchmakingClient::Match &match, MatchmakingClient::MatchResult result)
-	{
+	void OnMatched(const string &id, const MatchmakingClient::Match &match, MatchmakingClient::MatchResult result) {
 		Ptr<Session> session = AccountManager::FindLocalSession(id);
 		if (!session)
 			return;
 		Json response;
 		if (result == MatchmakingClient::kMRSuccess) {
-			// 매칭 성공
+			// 매치메이킹이 성공했습니다.
 			response["result"] = "Success";
 			response["A"] = match.context["A"];
 			response["B"] = match.context["B"];
@@ -105,12 +95,12 @@ namespace pong {
 			session->AddToContext("ready", 0);
 		}
 		else if (result == MatchmakingClient::kMRAlreadyRequested) {
-			// 이미 Matchmaking 요청을 했습니다.
+			// 이미 매치메이킹 요청을 했습니다.
 			response["result"] = "AlreadyRequested";
 			session->AddToContext("matching", "failed");
 		}
 		else if (result == MatchmakingClient::kMRTimeout) {
-		  // 지정된 시간안에 Match 가 성사되지 않았습니다.
+		  // 지정된 시간안에 매치메이킹이 성사되지 않았습니다.
 			response["result"] = "Timeout";
 			session->AddToContext("matching", "failed");
 		}
@@ -127,10 +117,8 @@ namespace pong {
 	// matching cancelled by timeout
 	void MatchingCancelledByClientTimeout(const string &id, MatchmakingClient::CancelResult result) {
 		LOG(INFO) << "MatchingCancelledByClientTimeout : " + id;
-	
 		Ptr<Session> session = AccountManager::FindLocalSession(id);
 		if (!session) {
-			LOG(INFO) << "MatchingCancelledByClientTimeout : Session is NULL!!!!!!";
 			return;
 		}
 		Json response;
@@ -141,13 +129,13 @@ namespace pong {
 	// matching requested
 	void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
 		Json context;
-		context["dummy"] = 1;
+		context.SetObject();
 		session->AddToContext("matching", "doing");
-		// timeout
+		// 매치메이킹 타임아웃을 지정합니다.
 		WallClock::Duration timeout = WallClock::FromMsec(10 * 1000);
 		MatchmakingClient::StartMatchmaking(0, AccountManager::FindLocalAccount(session), context, OnMatched, MatchmakingClient::kNullProgressCallback, timeout);
 		
-		// 매치메이킹이 알 수 없는 이유로 지나치게 오래 걸리는 경우를 대비해야한
+		// 매치메이킹이 알 수 없는 이유로 지나치게 오래 걸리는 경우를 대비해야합니다.
 		WallClock::Duration clientTimeout = timeout + WallClock::FromMsec(5 * 1000);
 		Timer::ExpireAfter(clientTimeout,
 			[session](const Timer::Id &timer_id, const WallClock::Value &clock) {
@@ -157,7 +145,7 @@ namespace pong {
 				session->GetFromContext("matching", &matchingState);
 				// 매치메이킹이 아직 진행중인 경우
 				if (matchingState == "doing") {
-					// 매치메이킹 취소
+					// 매치메이킹을 취소합니다.
 					MatchmakingClient::CancelMatchmaking(0, AccountManager::FindLocalAccount(session), MatchingCancelledByClientTimeout);
 				}
 			});
@@ -170,7 +158,7 @@ namespace pong {
 			return;
 		Json response;
 		if (result == MatchmakingClient::kCRNoRequest) {
-			// Matchmaking 을 요청이 없었습니다. (취소할 Matchmaking 이 없습니다)
+			// 매치메이킹 요청이 없었습니다. (취소할 Matchmaking 이 없습니다)
 			response["result"] = "NoRequest";
 			session->AddToContext("matching", "failed");
 		}
@@ -181,7 +169,7 @@ namespace pong {
 		}
 		else
 		{
-			// Matchmaking 요청이 취소되었습니다.
+			// 매치메이킹 요청이 취소되었습니다.
 			response["result"] = "Cancel";
 			session->AddToContext("matching", "cancelled");
 		}
@@ -193,12 +181,9 @@ namespace pong {
 	}
 
 	// 매치 취소를 요청하는 핸들러입니다.
-	// 클라이언트로부터 매치 취소 요청 메시지가 오면 이 핸들러가 호출된다고
-	// 가정하겠습니다.
 	void OnCancelRequested(const Ptr<Session> &session, const Json &message) {
 		session->AddToContext("matching", "cancel");
 		// matchmaking 취소를 요청합니다.
-		// matchmaking 취소 처리가 완료되면 OnCancelled 함수가 호출됩니다.
 		MatchmakingClient::CancelMatchmaking(0, AccountManager::FindLocalAccount(session), OnCancelled);
 	}
 
@@ -208,11 +193,12 @@ namespace pong {
 		string opponentId;
 		session->GetFromContext("opponent", &opponentId);
 		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
+		// 상대의 상태를 확인합니다.
 		if (opponentSession && opponentSession->IsTransportAttached()) {
 			int64_t is_opponent_ready = 0;
 			opponentSession->GetFromContext("ready", &is_opponent_ready);
-			if (is_opponent_ready == 1)
-			{
+			if (is_opponent_ready == 1) {
+				// 둘 다 준비가 되었습니다. 시작 신호를 보냅니다.
 				Json response;
 				response["result"] = "ok";
 				session->SendMessage("start", response);
@@ -220,7 +206,7 @@ namespace pong {
 			}
 		}
 		else {
-			// 상대가 접속을 종료했음
+			// 상대가 접속을 종료했습니다.
 			Json response;
 			response["result"] = "opponent disconnected";
 			session->SendMessage("match", response, kDefaultEncryption, kTcp);
@@ -228,6 +214,7 @@ namespace pong {
 		}
 	}
 
+	// 메세지 릴레이를 수행합니다. tcp, udp 둘 다 이 함수로 처리합니다.
 	void OnRelayRequested(const Ptr<Session> &session, const Json &message) {
 		string opponentId;
 		session->GetFromContext("opponent", &opponentId);
@@ -237,38 +224,27 @@ namespace pong {
 	}
 	
 	void OnResultRequested(const Ptr<Session> &session, const Json &message) {
-		// 패배한 쪽만 result를 보낸다.
-		// 상대방에게 이겼다는 메세지를 보낸다.
+		// 패배한 쪽만 result를 보내도록 되어있습니다.
 		string opponentId;
 		session->GetFromContext("opponent", &opponentId);
 		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
 		if (opponentSession && opponentSession->IsTransportAttached()) {
+			// 상대에게 승리했음을 알립니다.
 			Json winMessage;
 			winMessage["result"] = "win";
 			opponentSession->SendMessage("result", winMessage);
 		}
-		// 패배 확인 메세지를 보낸다.
+		// 패배 확인 메세지를 보냅니다.
 		session->SendMessage("result", message);
 	}
 
-
 	// regist handlers
 	void RegisterEventHandlers() {
-	  /*
-	   * Registers handlers for session close/open events.
-	   */
 		{
 			HandlerRegistry::Install2(OnSessionOpened, OnSessionClosed);
 			HandlerRegistry::RegisterTcpTransportDetachedHandler(OnTransportTcpDetached);
 		}
-
-
-		  /*
-		   * Registers handlers for messages from the client.
-		   *
-		   * Handlers below are just for you reference.
-		   * Feel free to delete them and replace with your own.
-		   */
+		
 		{
 			JsonSchema login_msg(JsonSchema::kObject, JsonSchema("id", JsonSchema::kString, true));
 			HandlerRegistry::Register("login", OnAccountLogin, login_msg);
