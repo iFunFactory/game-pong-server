@@ -18,11 +18,79 @@ namespace pong {
 		logger::SessionClosed(to_string(session->id()), WallClock::Now());
 	}
 	
+	void AsyncLogoutCallback(const string &id, const Ptr<Session> &session, bool ret)
+	{
+		if (ret == 1) {
+			LOG(INFO) << "logout succeed : " << id;
+		}
+		else {
+			LOG(WARNING) << "logout failed : " << id;
+		}
+
+	}
+
+	void AsyncLoginCallback(const string &id, const Ptr<Session> &session, bool ret) {
+		Json response;
+
+		if (ret == 1) {
+			logger::PlayerLoggedIn(to_string(session->id()), id, WallClock::Now());
+			response["result"] = "ok";
+			LOG(INFO) << "login succeed : " << id;
+		}
+		else {
+			// 로그인 실패
+			response["result"] = "nop";
+			response["msg"] = "Fail to login.";
+			LOG(WARNING) << "login failed : " << id;
+			// 중복 아이디 정책: 동일한 아이디가 있다면 이전 로그인을 취소합니다.
+			AccountManager::SetLoggedOutAsync(id, AsyncLogoutCallback);
+			// TODO: 이전 세션 처리가 필요합니다.
+		}
+        	session->SendMessage("login", response, kDefaultEncryption, kTcp);
+	}
+
+	void FBAuthenticate(
+		const string &fb_uid,
+		const Ptr<Session> &session,
+		const AccountAuthenticationRequest &request,
+		const AccountAuthenticationResponse &response,
+		const bool &error) {
+
+		Json msg;
+		msg["result"] = "nop";
+
+		LOG(INFO) << "Try authentication...";
+		if (error) {
+			LOG(INFO) << "authentication error";
+			LOG(ERROR) << "authentication system error";
+			msg["msg"] = "FB autentication error";
+			session->SendMessage("login", msg, kDefaultEncryption, kTcp);
+			return;
+		}
+
+		// 오류는 발생하지 않았지만, 인증 결과가 실패한 경우입니다.
+		// 클라이언트가 가짜로 access token 을 만들어 보내는 경우 등이 포함됩니다.
+		if (not response.success) {
+			// login failure
+			LOG(INFO) << "FB authentication failed. code(" << response.reason_code << "),"
+			<< "description(" << response.reason_description << ")";
+			msg["msg"] = "FB authentication failed. description[" + response.reason_description + "]";
+
+			session->SendMessage("login", msg, kDefaultEncryption, kTcp);
+			return;
+		}
+		// 인증에 성공했습니다.
+		
+		LOG(INFO) << "FB authentication success: " << fb_uid;
+		AccountManager::CheckAndSetLoggedInAsync(fb_uid, session, AsyncLoginCallback);
+	}	
+	
+	
 	// 매치메이킹 중 클라이언트와의 연결이 끊어졌을 때의 콜백입니다.
 	void MatchingCancelledByTransportDetaching(const string &id, MatchmakingClient::CancelResult result) {
 		LOG(INFO) << "MatchingCancelledByTransportDetaching : " << id;
 	}
-
+	
 	// transport detached
 	void OnTransportTcpDetached(const Ptr<Session> &session) {
 		LOG(INFO) << "OnTransportTcpDetached : " << to_string(session->id()) << " : " << AccountManager::FindLocalAccount(session);
@@ -57,25 +125,23 @@ namespace pong {
 	
 	// 로그인 요청
 	void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
-		// 각 플랫폼 별 device id를 사용하여 중복체크만 합니다.
 		string id = message["id"].GetString();
-		Json response;
-		if (AccountManager::CheckAndSetLoggedIn(id, session)) {
-			logger::PlayerLoggedIn(to_string(session->id()), id, WallClock::Now());
-			response["result"] = "ok";
-			LOG(INFO) << "login succeed : " << id;
+		string type = message["type"].GetString();
+               	
+		if(type.compare("fb") == 0){
+			string access_token = message["access_token"].GetString();
+			
+			AuthenticationKey auth_key = MakeFacebookAuthenticationKey(access_token);
+                	AccountAuthenticationRequest req("Facebook", id, auth_key);
+	                AuthenticationResponseHandler callback = bind(&FBAuthenticate, id, session, _1, _2, _3);
+	                Authenticate(req, callback);
+		
+		} else {
+			AccountManager::CheckAndSetLoggedInAsync(id, session, AsyncLoginCallback);
 		}
-		else {
-			// 로그인 실패
-			response["result"] = "nop";
-			LOG(WARNING) << "login failed : " << id;
-			// 중복 아이디 정책: 동일한 아이디가 있다면 이전 로그인을 취소합니다.
-			AccountManager::SetLoggedOut(id);
-			// TODO: 이전 세션 처리가 필요합니다.
-		}
-		session->SendMessage("login", response);
 	}
-	
+
+
 	// matched
 	void OnMatched(const string &id, const MatchmakingClient::Match &match, MatchmakingClient::MatchResult result) {
 		Ptr<Session> session = AccountManager::FindLocalSession(id);
@@ -238,6 +304,8 @@ namespace pong {
 		session->SendMessage("result", message);
 	}
 
+
+
 	// regist handlers
 	void RegisterEventHandlers() {
 		{
@@ -252,7 +320,7 @@ namespace pong {
 			HandlerRegistry::Register("ready", OnReadySignal);
 			HandlerRegistry::Register("relay", OnRelayRequested);
 			HandlerRegistry::Register("result", OnResultRequested);
+			HandlerRegistry::Register("cancelmatch", OnCancelRequested);
 		}
 	}
-
 }  // namespace pong
