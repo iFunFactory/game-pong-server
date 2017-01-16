@@ -7,7 +7,6 @@
 #include "pong_messages.pb.h"
 
 namespace pong {
-
 	// session opened
 	void OnSessionOpened(const Ptr<Session> &session) {
 		logger::SessionOpened(to_string(session->id()), WallClock::Now());
@@ -17,7 +16,7 @@ namespace pong {
 	void OnSessionClosed(const Ptr<Session> &session, SessionCloseReason reason) {
 		logger::SessionClosed(to_string(session->id()), WallClock::Now());
 	}
-	
+
 	void AsyncLogoutCallback(const string &id, const Ptr<Session> &session, bool ret)
 	{
 		if (ret == 1) {
@@ -26,15 +25,46 @@ namespace pong {
 		else {
 			LOG(WARNING) << "logout failed : " << id;
 		}
+	}
 
+	void UpdateMatchRecord(const string& winnerId, const string& loserId)
+	{
+		Ptr<User> winner = User::FetchById(winnerId);
+		Ptr<User> loser = User::FetchById(loserId);
+
+		if(not winner) {
+			LOG(ERROR) << "Cannot find winner's id in db" << winnerId;
+			return;
+		}
+
+		if(not loser) {
+			LOG(ERROR) << "Cannot find loser's id in db" << loserId;
+			return;
+		}
+
+		winner->SetWinCount(winner->GetWinCount() + 1);
+		loser->SetLoseCount(loser->GetLoseCount() + 1);
 	}
 
 	void AsyncLoginCallback(const string &id, const Ptr<Session> &session, bool ret) {
+		Ptr<User> user = User::FetchById(id);
+
+		if(not user) {
+			LOG(INFO) << "Create new user: " << id;
+			user = User::Create(id);
+		} else {
+			LOG(INFO) << "Already exist user";
+		}
+
 		Json response;
+
+		response["winCount"] = user->GetWinCount();
+		response["loseCount"] = user->GetLoseCount();
 
 		if (ret == 1) {
 			logger::PlayerLoggedIn(to_string(session->id()), id, WallClock::Now());
 			response["result"] = "ok";
+			session->AddToContext("id", id);
 			LOG(INFO) << "login succeed : " << id;
 		}
 		else {
@@ -80,17 +110,17 @@ namespace pong {
 			return;
 		}
 		// 인증에 성공했습니다.
-		
+
 		LOG(INFO) << "FB authentication success: " << fb_uid;
 		AccountManager::CheckAndSetLoggedInAsync(fb_uid, session, AsyncLoginCallback);
-	}	
-	
-	
+	}
+
+
 	// 매치메이킹 중 클라이언트와의 연결이 끊어졌을 때의 콜백입니다.
 	void MatchingCancelledByTransportDetaching(const string &id, MatchmakingClient::CancelResult result) {
 		LOG(INFO) << "MatchingCancelledByTransportDetaching : " << id;
 	}
-	
+
 	// transport detached
 	void OnTransportTcpDetached(const Ptr<Session> &session) {
 		LOG(INFO) << "OnTransportTcpDetached : " << to_string(session->id()) << " : " << AccountManager::FindLocalAccount(session);
@@ -103,6 +133,10 @@ namespace pong {
 			Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
 			if (opponentSession && opponentSession->IsTransportAttached())
 			{
+				string myId;
+				session->GetFromContext("id", &myId);
+				UpdateMatchRecord(opponentId, myId);
+
 				Json message;
 				message["result"] = "win";
 				opponentSession->SendMessage("result", message, kDefaultEncryption, kTcp);
@@ -122,20 +156,20 @@ namespace pong {
 	}
 
 	// 메세지 핸들러
-	
+
 	// 로그인 요청
 	void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
 		string id = message["id"].GetString();
 		string type = message["type"].GetString();
-               	
+
 		if(type.compare("fb") == 0){
 			string access_token = message["access_token"].GetString();
-			
+
 			AuthenticationKey auth_key = MakeFacebookAuthenticationKey(access_token);
                 	AccountAuthenticationRequest req("Facebook", id, auth_key);
 	                AuthenticationResponseHandler callback = bind(&FBAuthenticate, id, session, _1, _2, _3);
 	                Authenticate(req, callback);
-		
+
 		} else {
 			AccountManager::CheckAndSetLoggedInAsync(id, session, AsyncLoginCallback);
 		}
@@ -288,12 +322,18 @@ namespace pong {
 		if (opponentSession && opponentSession->IsTransportAttached())
 			opponentSession->SendMessage("relay", message);
 	}
-	
+
 	void OnResultRequested(const Ptr<Session> &session, const Json &message) {
 		// 패배한 쪽만 result를 보내도록 되어있습니다.
+		string myId;
+		session->GetFromContext("id", &myId);
+
 		string opponentId;
 		session->GetFromContext("opponent", &opponentId);
 		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
+
+		UpdateMatchRecord(opponentId, myId);
+
 		if (opponentSession && opponentSession->IsTransportAttached()) {
 			// 상대에게 승리했음을 알립니다.
 			Json winMessage;
@@ -301,10 +341,13 @@ namespace pong {
 			opponentSession->SendMessage("result", winMessage);
 		}
 		// 패배 확인 메세지를 보냅니다.
+
 		session->SendMessage("result", message);
+
+		// 각각 상대방에 대한 정보를 삭제합니다.
+		opponentSession->DeleteFromContext("opponent");
+		session->DeleteFromContext("opponent");
 	}
-
-
 
 	// regist handlers
 	void RegisterEventHandlers() {
@@ -312,7 +355,7 @@ namespace pong {
 			HandlerRegistry::Install2(OnSessionOpened, OnSessionClosed);
 			HandlerRegistry::RegisterTcpTransportDetachedHandler(OnTransportTcpDetached);
 		}
-		
+
 		{
 			JsonSchema login_msg(JsonSchema::kObject, JsonSchema("id", JsonSchema::kString, true));
 			HandlerRegistry::Register("login", OnAccountLogin, login_msg);

@@ -1,5 +1,7 @@
 {
   "User": {
-    "Id": "String KEY"
+    "Id": "String(64) KEY",
+    "WinCount": "Integer",
+    "LoseCount": "Integer"
   }
 }

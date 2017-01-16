@@ -381,7 +381,7 @@ int64_t MapRef<int64_t, ValueType>::FindFirstEmptySlot() const {
 void ObjectModelInit();
 
 
-#ifdef ENABLE_FUNAPI_CS_API
+#ifdef ENABLE_IFUN_DEPLOY_COMPATIBILITY
 
 namespace cs_api {
 
@@ -450,7 +450,7 @@ class CsApiHandler {
 bool InitializeCustomerServiceAPI(CsApiHandler *handler);
 
 }  // namespace cs_api
-#endif
+#endif  // ENABLE_IFUN_DEPLOY_COMPATIBILITY
 
 };  // namespace pong
 

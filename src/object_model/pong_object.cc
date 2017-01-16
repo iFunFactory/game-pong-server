@@ -395,8 +395,12 @@ void FetchObjectFromMap(const MapRef<KeyType, Object::Id> &map, bool include_nul
 
 struct User::OpaqueData {
   OpaqueData() {
+    win_count = 0;
+    lose_count = 0;
   }
 
+  int64_t win_count;
+  int64_t lose_count;
 };
 
 
@@ -412,6 +416,18 @@ function<bool(const Ptr<User> &)> User::MatchByObjectId(const Object::Id &object
 function<bool(const Ptr<User> &)> User::MatchById(const string &id, MatchCondition cond) {
   function<string(const Ptr<User> &)> attribute_getter = bind(&User::GetId, _1);
   return bind(&CompareAttribute<User, string>, _1, id, attribute_getter, cond);
+}
+
+
+function<bool(const Ptr<User> &)> User::MatchByWinCount(const int64_t &win_count, MatchCondition cond) {
+  function<int64_t(const Ptr<User> &)> attribute_getter = bind(&User::GetWinCount, _1);
+  return bind(&CompareAttribute<User, int64_t>, _1, win_count, attribute_getter, cond);
+}
+
+
+function<bool(const Ptr<User> &)> User::MatchByLoseCount(const int64_t &lose_count, MatchCondition cond) {
+  function<int64_t(const Ptr<User> &)> attribute_getter = bind(&User::GetLoseCount, _1);
+  return bind(&CompareAttribute<User, int64_t>, _1, lose_count, attribute_getter, cond);
 };
 
 
@@ -420,8 +436,28 @@ void User::RegisterIdTrigger(const TriggerCondition &condition, const TriggerAct
 }
 
 
+void User::RegisterWinCountTrigger(const TriggerCondition &condition, const TriggerAction &action) {
+  Object::RegisterAttributeTrigger("User", "WinCount", condition, action);
+}
+
+
+void User::RegisterLoseCountTrigger(const TriggerCondition &condition, const TriggerAction &action) {
+  Object::RegisterAttributeTrigger("User", "LoseCount", condition, action);
+}
+
+
 void User::SelectById(const Object::ConditionType &cond_type, const string &cond_value, const Object::SelectCallback &callback) {
   Object::Select("User", "Id", "", cond_type, AttributeValue(cond_value), callback);
+}
+
+
+void User::SelectByWinCount(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback) {
+  Object::Select("User", "WinCount", "", cond_type, AttributeValue(cond_value), callback);
+}
+
+
+void User::SelectByLoseCount(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback) {
+  Object::Select("User", "LoseCount", "", cond_type, AttributeValue(cond_value), callback);
 }
 
 
@@ -433,6 +469,20 @@ Ptr<User::OpaqueData> User::CreateOpaqueDataFromJson(const Json &json) {
 
   Ptr<OpaqueData> data(new OpaqueData);
 
+  if (json.HasAttribute("WinCount")) {
+    if (not json["WinCount"].IsInteger()) {
+      LOG(ERROR) << "wrong 'WinCount' value: type mismatch";
+      return Ptr<OpaqueData>();
+    }
+    data->win_count = json["WinCount"].GetInteger();
+  }
+  if (json.HasAttribute("LoseCount")) {
+    if (not json["LoseCount"].IsInteger()) {
+      LOG(ERROR) << "wrong 'LoseCount' value: type mismatch";
+      return Ptr<OpaqueData>();
+    }
+    data->lose_count = json["LoseCount"].GetInteger();
+  }
   return data;
 }
 
@@ -601,6 +651,8 @@ void User::Delete() {
 
 
 bool User::PopulateFrom(const Ptr<OpaqueData> &opaque_data) {
+  SetWinCount(opaque_data->win_count);
+  SetLoseCount(opaque_data->lose_count);
   return true;
 }
 
@@ -615,6 +667,26 @@ void User::SetId(const string &value) {
   BOOST_ASSERT(object());object()->SetString("Id", value);}
 
 
+int64_t User::GetWinCount() const {
+  BOOST_ASSERT(object());
+  return object()->GetInteger("WinCount");
+}
+
+
+void User::SetWinCount(const int64_t &value) {
+  BOOST_ASSERT(object());object()->SetInteger("WinCount", value);}
+
+
+int64_t User::GetLoseCount() const {
+  BOOST_ASSERT(object());
+  return object()->GetInteger("LoseCount");
+}
+
+
+void User::SetLoseCount(const int64_t &value) {
+  BOOST_ASSERT(object());object()->SetInteger("LoseCount", value);}
+
+
 User::User(const Ptr<Object> &object)
     : ObjectProxy(object) {
 }
@@ -626,7 +698,17 @@ void RegisterUserModel() {
   attrs.push_back(Ptr<const AttributeModel>(
       new AttributeModel(
           // not attribute.map
-          "Id", fun::AttributeModel::kString, 0, true, false, false, false, false)));
+          "Id", fun::AttributeModel::kString, 64, true, false, false, false, false)));
+  // not attribute.object
+  attrs.push_back(Ptr<const AttributeModel>(
+      new AttributeModel(
+          // not attribute.map
+          "WinCount", fun::AttributeModel::kInteger, 0, false, false, false, false, false)));
+  // not attribute.object
+  attrs.push_back(Ptr<const AttributeModel>(
+      new AttributeModel(
+          // not attribute.map
+          "LoseCount", fun::AttributeModel::kInteger, 0, false, false, false, false, false)));
 
   Ptr<const ObjectModel> model(new ObjectModel("User", attrs));
   ObjectModel::AddModel(model);
@@ -655,6 +737,8 @@ void DumpJson(const User &obj, Json *dest) {
 
   Json &out = *dest;
   out["Id"].SetString(obj.GetId());
+  out["WinCount"].SetInteger(obj.GetWinCount());
+  out["LoseCount"].SetInteger(obj.GetLoseCount());
 }
 
 
@@ -665,7 +749,7 @@ void DumpJson(const Ptr<const User> &obj, Json *dest) {
 }
 
 
-#ifdef ENABLE_FUNAPI_CS_API
+#ifdef ENABLE_IFUN_DEPLOY_COMPATIBILITY
 namespace cs_api {
 
 using fun::Json;
@@ -681,7 +765,7 @@ static CsApiHandler *g_handler = NULL;
 
 
 CsApiHandler::CsApiHandler() : schemas_(boost::assign::map_list_of
-    ("User", "{\"User\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"Id\", \"key\": true}], \"type\": \"object\"}}").convert_to_container<boost::unordered_map<string, string> >()),
+    ("User", "{\"User\": {\"propertylist\": [{\"readonly\": true, \"type\": \"string\", \"name\": \"Id\", \"key\": true}, {\"type\": \"integer\", \"name\": \"WinCount\"}, {\"type\": \"integer\", \"name\": \"LoseCount\"}], \"type\": \"object\"}}").convert_to_container<boost::unordered_map<string, string> >()),
   getters_(boost::assign::map_list_of("User", FetchUser).convert_to_container<CsApiHandler::getter_map>())
 {
 }
@@ -1074,6 +1158,6 @@ bool InitializeCustomerServiceAPI(CsApiHandler *handler) {
 }
 
 }  // namespace cs_api
-#endif
+#endif  // ENABLE_IFUN_DEPLOY_COMPATIBILITY
 
 };  // namespace pong

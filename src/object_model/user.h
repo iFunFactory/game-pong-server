@@ -33,13 +33,19 @@ class User : public ObjectProxy {
 
   static function<bool(const Ptr<User> &)> MatchByObjectId(const Object::Id &object_id);
   static function<bool(const Ptr<User> &)> MatchById(const string &id, MatchCondition cond = kEqual);
+  static function<bool(const Ptr<User> &)> MatchByWinCount(const int64_t &win_count, MatchCondition cond = kEqual);
+  static function<bool(const Ptr<User> &)> MatchByLoseCount(const int64_t &lose_count, MatchCondition cond = kEqual);
 
   typedef function<bool(const Object::Id &/*object id*/)> TriggerCondition;
   typedef function<void(const Object::Id &/*object id*/)> TriggerAction;
 
   static void RegisterIdTrigger(const TriggerCondition &condition, const TriggerAction &action);
+  static void RegisterWinCountTrigger(const TriggerCondition &condition, const TriggerAction &action);
+  static void RegisterLoseCountTrigger(const TriggerCondition &condition, const TriggerAction &action);
 
   static void SelectById(const Object::ConditionType &cond_type, const string &cond_value, const Object::SelectCallback &callback);
+  static void SelectByWinCount(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback);
+  static void SelectByLoseCount(const Object::ConditionType &cond_type, const int64_t &cond_value, const Object::SelectCallback &callback);
 
   static Ptr<OpaqueData> CreateOpaqueDataFromJson(const Json &json);
 
@@ -87,6 +93,14 @@ class User : public ObjectProxy {
   // Getter/Setter for 'Id' attribute
   string GetId() const;
   void SetId(const string &value);
+
+  // Getter/Setter for 'WinCount' attribute
+  int64_t GetWinCount() const;
+  void SetWinCount(const int64_t &value);
+
+  // Getter/Setter for 'LoseCount' attribute
+  int64_t GetLoseCount() const;
+  void SetLoseCount(const int64_t &value);
 
  private:
   User(const Ptr<Object> &object);

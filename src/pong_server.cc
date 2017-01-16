@@ -19,10 +19,8 @@ class PongServer : public Component {
 	// 초기화 부분입니다.
     pong::ObjectModelInit();
     pong::RegisterEventHandlers();
-
 	// MatchmakingServer를 시작합니다.
-	MatchmakingServer::Start(CheckMatch, CheckCompletion, OnJoined, OnLeft);
-
+    MatchmakingServer::Start(CheckMatch, CheckCompletion, OnJoined, OnLeft);
     return true;
   }
 
@@ -63,6 +61,7 @@ class PongServer : public Component {
   static bool Uninstall() {
     return true;
   }
+
 };
 
 }  // unnamed namespace

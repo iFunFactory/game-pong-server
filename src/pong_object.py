@@ -69,6 +69,10 @@ def initialize(user, password, host, database, zookeeper_hosts, app_name):
 object = funapi.ObjectModel('User')
 attribute = funapi.AttributeModel('Id', 'String', True, False, False, False, False, '')
 object.add_attribute_model(attribute)
+attribute = funapi.AttributeModel('WinCount', 'Integer', False, False, False, False, False, '')
+object.add_attribute_model(attribute)
+attribute = funapi.AttributeModel('LoseCount', 'Integer', False, False, False, False, False, '')
+object.add_attribute_model(attribute)
 attribute = funapi.AttributeModel('_tag', 'String', False, False, False, False, False, '')
 object.add_attribute_model(attribute)
 funapi.ObjectModel.add_object_model(object)
@@ -120,6 +124,18 @@ class User:
 
   def set_Id(self, value):
     self.object_.set_attribute('Id', value)
+
+  def get_WinCount(self):
+    return self.object_.get_attribute('WinCount')
+
+  def set_WinCount(self, value):
+    self.object_.set_attribute('WinCount', value)
+
+  def get_LoseCount(self):
+    return self.object_.get_attribute('LoseCount')
+
+  def set_LoseCount(self, value):
+    self.object_.set_attribute('LoseCount', value)
 
   def get__tag(self):
     return self.object_.get_attribute('_tag')
