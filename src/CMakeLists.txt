@@ -10,6 +10,8 @@ set(
   ADDITIONAL_CPP_SOURCES
   event_handlers.cc
   event_handlers.h
+  leaderboard_handlers.cc
+  leaderboard_handlers.h
   ${PROJECT_NAME}_server.cc
 )
 

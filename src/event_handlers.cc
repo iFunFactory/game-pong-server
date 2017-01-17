@@ -1,4 +1,5 @@
 #include "event_handlers.h"
+#include "leaderboard_handlers.h"
 
 #include <funapi.h>
 #include <glog/logging.h>
@@ -58,6 +59,7 @@ namespace pong {
 
 		Json response;
 
+		response["id"] = id;
 		response["winCount"] = user->GetWinCount();
 		response["loseCount"] = user->GetLoseCount();
 
@@ -136,6 +138,8 @@ namespace pong {
 				string myId;
 				session->GetFromContext("id", &myId);
 				UpdateMatchRecord(opponentId, myId);
+				pong_lb::UpdateCurWincount(opponentId);
+				pong_lb::SetWincountToZero(myId);
 
 				Json message;
 				message["result"] = "win";
@@ -339,14 +343,19 @@ namespace pong {
 			Json winMessage;
 			winMessage["result"] = "win";
 			opponentSession->SendMessage("result", winMessage);
+			pong_lb::UpdateCurWincount(opponentId);
 		}
 		// 패배 확인 메세지를 보냅니다.
-
 		session->SendMessage("result", message);
+		pong_lb::SetWincountToZero(myId);
 
 		// 각각 상대방에 대한 정보를 삭제합니다.
 		opponentSession->DeleteFromContext("opponent");
 		session->DeleteFromContext("opponent");
+	}
+
+	void OnRanklistRequested(const Ptr<Session> &session, const Json &message) {
+		pong_lb::GetListTopEight(session);
 	}
 
 	// regist handlers
@@ -364,6 +373,7 @@ namespace pong {
 			HandlerRegistry::Register("relay", OnRelayRequested);
 			HandlerRegistry::Register("result", OnResultRequested);
 			HandlerRegistry::Register("cancelmatch", OnCancelRequested);
+			HandlerRegistry::Register("ranklist", OnRanklistRequested);
 		}
 	}
 }  // namespace pong
