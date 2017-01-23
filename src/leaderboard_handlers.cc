@@ -6,6 +6,8 @@
 #include "pong_loggers.h"
 #include "pong_messages.pb.h"
 
+DECLARE_string(app_flavor);
+
 namespace pong_lb {
 	const char *kPlayerCurWincount = "player_cur_wincount";
 	const char *kPlayerRecordWincount = "player_record_wincount";
@@ -16,11 +18,11 @@ namespace pong_lb {
 		const bool &error) {
 
 		if (error) {
-			LOG(ERROR) << "leaderboard system error";
+			LOG(ERROR) << "[" << FLAGS_app_flavor << "] leaderboard system error";
 			return;
 		}
 
-		LOG(INFO) << "new record: " << response.new_score;
+		LOG(INFO) << "[" << FLAGS_app_flavor << "] new record: " << response.new_score;
 
 		switch (response.result) {
 			case kNewRecord: {
@@ -60,11 +62,11 @@ namespace pong_lb {
 			const ScoreSubmissionResponse &response,
 			const bool &error) {
 		if (error) {
-			LOG(ERROR) << "leaderboard system error";
+			LOG(ERROR) << "[" << FLAGS_app_flavor << "] leaderboard system error";
 			return;
 		}
 
-		LOG(INFO) << "current score: " << response.new_score;
+		LOG(INFO) << "[" << FLAGS_app_flavor << "] current score: " << response.new_score;
 
 		switch (response.result) {
 			case kNewRecord: {
@@ -105,7 +107,7 @@ namespace pong_lb {
 			const ScoreSubmissionResponse &response,
 			const bool &error) {
 		if (error) {
-			LOG(ERROR) << "leaderboard system error";
+			LOG(ERROR) << "[" << FLAGS_app_flavor << "] leaderboard system error";
 			return;
 		}
 
@@ -135,7 +137,7 @@ namespace pong_lb {
 			const bool &error) {
 
 		if (error) {
-			LOG(ERROR) << "leaderboard system error";
+			LOG(ERROR) << "[" << FLAGS_app_flavor << "] leaderboard system error";
 			return;
 		}
 

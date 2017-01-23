@@ -1,5 +1,7 @@
 #include "event_handlers.h"
 #include "leaderboard_handlers.h"
+#include "rpc_handlers.h"
+#include "pong_utils.h"
 
 #include <funapi.h>
 #include <glog/logging.h>
@@ -7,7 +9,10 @@
 #include "pong_loggers.h"
 #include "pong_messages.pb.h"
 
+DECLARE_string(app_flavor);
+
 namespace pong {
+
 	// session opened
 	void OnSessionOpened(const Ptr<Session> &session) {
 		logger::SessionOpened(to_string(session->id()), WallClock::Now());
@@ -21,10 +26,10 @@ namespace pong {
 	void AsyncLogoutCallback(const string &id, const Ptr<Session> &session, bool ret)
 	{
 		if (ret == 1) {
-			LOG(INFO) << "logout succeed : " << id;
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] logout succeed : " << id;
 		}
 		else {
-			LOG(WARNING) << "logout failed : " << id;
+			LOG(WARNING) << "[" << FLAGS_app_flavor << "] logout failed : " << id;
 		}
 	}
 
@@ -34,12 +39,12 @@ namespace pong {
 		Ptr<User> loser = User::FetchById(loserId);
 
 		if(not winner) {
-			LOG(ERROR) << "Cannot find winner's id in db" << winnerId;
+			LOG(ERROR) << "[" << FLAGS_app_flavor << "] Cannot find winner's id in db" << winnerId;
 			return;
 		}
 
 		if(not loser) {
-			LOG(ERROR) << "Cannot find loser's id in db" << loserId;
+			LOG(ERROR) << "[" << FLAGS_app_flavor << "] Cannot find loser's id in db" << loserId;
 			return;
 		}
 
@@ -51,10 +56,10 @@ namespace pong {
 		Ptr<User> user = User::FetchById(id);
 
 		if(not user) {
-			LOG(INFO) << "Create new user: " << id;
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] Create new user: " << id;
 			user = User::Create(id);
 		} else {
-			LOG(INFO) << "Already exist user";
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] Already exist user";
 		}
 
 		Json response;
@@ -67,13 +72,14 @@ namespace pong {
 			logger::PlayerLoggedIn(to_string(session->id()), id, WallClock::Now());
 			response["result"] = "ok";
 			session->AddToContext("id", id);
-			LOG(INFO) << "login succeed : " << id;
+			// 로그인에 성공하면 로비서버로 이동합니다.
+			pong_util::MoveServerByTag(session, "lobby");
 		}
 		else {
 			// 로그인 실패
 			response["result"] = "nop";
 			response["msg"] = "Fail to login.";
-			LOG(WARNING) << "login failed : " << id;
+			LOG(WARNING) << "[" << FLAGS_app_flavor << "] login failed : " << id;
 			// 중복 아이디 정책: 동일한 아이디가 있다면 이전 로그인을 취소합니다.
 			AccountManager::SetLoggedOutAsync(id, AsyncLogoutCallback);
 			// TODO: 이전 세션 처리가 필요합니다.
@@ -91,10 +97,10 @@ namespace pong {
 		Json msg;
 		msg["result"] = "nop";
 
-		LOG(INFO) << "Try authentication...";
+		LOG(INFO) << "[" << FLAGS_app_flavor << "]Try authentication...";
 		if (error) {
-			LOG(INFO) << "authentication error";
-			LOG(ERROR) << "authentication system error";
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] authentication error";
+			LOG(ERROR) << "[" << FLAGS_app_flavor << "] authentication system error";
 			msg["msg"] = "FB autentication error";
 			session->SendMessage("login", msg, kDefaultEncryption, kTcp);
 			return;
@@ -104,28 +110,27 @@ namespace pong {
 		// 클라이언트가 가짜로 access token 을 만들어 보내는 경우 등이 포함됩니다.
 		if (not response.success) {
 			// login failure
-			LOG(INFO) << "FB authentication failed. code(" << response.reason_code << "),"
-			<< "description(" << response.reason_description << ")";
-			msg["msg"] = "FB authentication failed. description[" + response.reason_description + "]";
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] FB authentication failed. code(" << response.reason_code << ")," << "description(" << response.reason_description << ")";
+			msg["msg"] = "FB authentication failed. description(" + response.reason_description + ")";
 
 			session->SendMessage("login", msg, kDefaultEncryption, kTcp);
 			return;
 		}
 		// 인증에 성공했습니다.
 
-		LOG(INFO) << "FB authentication success: " << fb_uid;
+		LOG(INFO) << "[" << FLAGS_app_flavor << "] FB authentication success: " << fb_uid;
 		AccountManager::CheckAndSetLoggedInAsync(fb_uid, session, AsyncLoginCallback);
 	}
 
 
 	// 매치메이킹 중 클라이언트와의 연결이 끊어졌을 때의 콜백입니다.
 	void MatchingCancelledByTransportDetaching(const string &id, MatchmakingClient::CancelResult result) {
-		LOG(INFO) << "MatchingCancelledByTransportDetaching : " << id;
+		LOG(INFO) << "[" << FLAGS_app_flavor << "] MatchingCancelledByTransportDetaching : " << id;
 	}
 
 	// transport detached
 	void OnTransportTcpDetached(const Ptr<Session> &session) {
-		LOG(INFO) << "OnTransportTcpDetached : " << to_string(session->id()) << " : " << AccountManager::FindLocalAccount(session);
+		LOG(INFO) << "[" << FLAGS_app_flavor << "] OnTransportTcpDetached : " << to_string(session->id()) << " : " << AccountManager::FindLocalAccount(session);
 		// 대전 상대가 있는지 확인합니다.
 		string opponentId;
 		session->GetFromContext("opponent", &opponentId);
@@ -140,6 +145,7 @@ namespace pong {
 				UpdateMatchRecord(opponentId, myId);
 				pong_lb::UpdateCurWincount(opponentId);
 				pong_lb::SetWincountToZero(myId);
+				pong_util::MoveServerByTag(opponentSession, "lobby");
 
 				Json message;
 				message["result"] = "win";
@@ -152,11 +158,10 @@ namespace pong {
 		if (!matchingContext.empty() && matchingContext == "doing")
 		{
 			// 매치메이킹이 진행 중인 경우, 취소합니다.
-			MatchmakingClient::CancelMatchmaking(0, AccountManager::FindLocalAccount(session), MatchingCancelledByTransportDetaching);
+			pong_rpc::CancelMatchmakingRpcByTcpDetached(session);
 		}
 		// 로그아웃하고 세션을 종료합니다.
 		AccountManager::SetLoggedOut(AccountManager::FindLocalAccount(session));
-		session->Close();
 	}
 
 	// 메세지 핸들러
@@ -179,118 +184,15 @@ namespace pong {
 		}
 	}
 
-
-	// matched
-	void OnMatched(const string &id, const MatchmakingClient::Match &match, MatchmakingClient::MatchResult result) {
-		Ptr<Session> session = AccountManager::FindLocalSession(id);
-		if (!session)
-			return;
-		Json response;
-		if (result == MatchmakingClient::kMRSuccess) {
-			// 매치메이킹이 성공했습니다.
-			response["result"] = "Success";
-			response["A"] = match.context["A"];
-			response["B"] = match.context["B"];
-			if (match.context["A"].GetString().compare(id) == 0)
-				session->AddToContext("opponent", match.context["B"].GetString());
-			else
-				session->AddToContext("opponent", match.context["A"].GetString());
-			session->AddToContext("matching", "done");
-			session->AddToContext("ready", 0);
-		}
-		else if (result == MatchmakingClient::kMRAlreadyRequested) {
-			// 이미 매치메이킹 요청을 했습니다.
-			response["result"] = "AlreadyRequested";
-			session->AddToContext("matching", "failed");
-		}
-		else if (result == MatchmakingClient::kMRTimeout) {
-		  // 지정된 시간안에 매치메이킹이 성사되지 않았습니다.
-			response["result"] = "Timeout";
-			session->AddToContext("matching", "failed");
-		}
-		else {
-		  // 오류가 발생 하였습니다. 로그를 참고 합니다.
-			response["result"] = "Error";
-			session->AddToContext("matching", "failed");
-		}
-		
-		LOG(INFO) << "OnMatched : " + response["result"].ToString() + " : " + match.context.ToString();
-		session->SendMessage("match", response, kDefaultEncryption, kTcp);
-	}
-	
-	// matching cancelled by timeout
-	void MatchingCancelledByClientTimeout(const string &id, MatchmakingClient::CancelResult result) {
-		LOG(INFO) << "MatchingCancelledByClientTimeout : " + id;
-		Ptr<Session> session = AccountManager::FindLocalSession(id);
-		if (!session) {
-			return;
-		}
-		Json response;
-		response["result"] = "Timeout";
-		session->SendMessage("match", response, kDefaultEncryption, kTcp);
-	}
-
-	// matching requested
-	void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
-		Json context;
-		context.SetObject();
-		session->AddToContext("matching", "doing");
-		// 매치메이킹 타임아웃을 지정합니다.
-		WallClock::Duration timeout = WallClock::FromMsec(10 * 1000);
-		MatchmakingClient::StartMatchmaking(0, AccountManager::FindLocalAccount(session), context, OnMatched, MatchmakingClient::kNullProgressCallback, timeout);
-		
-		// 매치메이킹이 알 수 없는 이유로 지나치게 오래 걸리는 경우를 대비해야합니다.
-		WallClock::Duration clientTimeout = timeout + WallClock::FromMsec(5 * 1000);
-		Timer::ExpireAfter(clientTimeout,
-			[session](const Timer::Id &timer_id, const WallClock::Value &clock) {
-				if (!session->IsTransportAttached())
-					return;
-				string matchingState;
-				session->GetFromContext("matching", &matchingState);
-				// 매치메이킹이 아직 진행중인 경우
-				if (matchingState == "doing") {
-					// 매치메이킹을 취소합니다.
-					MatchmakingClient::CancelMatchmaking(0, AccountManager::FindLocalAccount(session), MatchingCancelledByClientTimeout);
-				}
-			});
-	}
-
-	// 매치가 취소되면 호출됩니다.
-	void OnCancelled(const string &id, MatchmakingClient::CancelResult result) {
-		Ptr<Session> session = AccountManager::FindLocalSession(id);
-		if (!session)
-			return;
-		Json response;
-		if (result == MatchmakingClient::kCRNoRequest) {
-			// 매치메이킹 요청이 없었습니다. (취소할 Matchmaking 이 없습니다)
-			response["result"] = "NoRequest";
-			session->AddToContext("matching", "failed");
-		}
-		else if (result == MatchmakingClient::kCRError) {
-			// 오류가 발생 하였습니다. 로그를 참고 합니다.
-			response["result"] = "Error";
-			session->AddToContext("matching", "failed");
-		}
-		else
-		{
-			// 매치메이킹 요청이 취소되었습니다.
-			response["result"] = "Cancel";
-			session->AddToContext("matching", "cancelled");
-		}
-
-		// Matchmaking 요청을 취소 했습니다.
-		LOG(INFO) << "match cancelled : " + id;
-		// 클라이언트에 응답을 보내는 작업 등의 후속처리를 합니다.
-		session->SendMessage("match", response, kDefaultEncryption, kTcp);
-	}
-
 	// 매치 취소를 요청하는 핸들러입니다.
 	void OnCancelRequested(const Ptr<Session> &session, const Json &message) {
-		session->AddToContext("matching", "cancel");
+		pong_rpc::CancelMatchmakingRpc(session);
 		// matchmaking 취소를 요청합니다.
-		MatchmakingClient::CancelMatchmaking(0, AccountManager::FindLocalAccount(session), OnCancelled);
 	}
 
+        void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
+		pong_rpc::MatchmakingRpc(session);
+        }
 	// 매칭 성공 후, 게임을 플레이할 준비가 되면 클라이언트는 ready를 보냅니다.
 	void OnReadySignal(const Ptr<Session> &session, const Json &message) {
 		session->AddToContext("ready", 1);
@@ -323,8 +225,11 @@ namespace pong {
 		string opponentId;
 		session->GetFromContext("opponent", &opponentId);
 		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-		if (opponentSession && opponentSession->IsTransportAttached())
+		if (opponentSession && opponentSession->IsTransportAttached()) {
+
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] relay. Session : " << session;
 			opponentSession->SendMessage("relay", message);
+		}
 	}
 
 	void OnResultRequested(const Ptr<Session> &session, const Json &message) {
@@ -352,6 +257,10 @@ namespace pong {
 		// 각각 상대방에 대한 정보를 삭제합니다.
 		opponentSession->DeleteFromContext("opponent");
 		session->DeleteFromContext("opponent");
+
+		// 두 플레이어를 lobby서버로 이동시킵니다.
+		pong_util::MoveServerByTag(opponentSession, "lobby");
+		pong_util::MoveServerByTag(session, "lobby");
 	}
 
 	void OnRanklistRequested(const Ptr<Session> &session, const Json &message) {
@@ -374,6 +283,14 @@ namespace pong {
 			HandlerRegistry::Register("result", OnResultRequested);
 			HandlerRegistry::Register("cancelmatch", OnCancelRequested);
 			HandlerRegistry::Register("ranklist", OnRanklistRequested);
+		}
+
+		{
+			pong_util::RegisterRedirectionHandlers();
+		}
+
+		{
+			pong_rpc::RegisterRpcHandlers();
 		}
 	}
 }  // namespace pong

@@ -12,6 +12,10 @@ set(
   event_handlers.h
   leaderboard_handlers.cc
   leaderboard_handlers.h
+  rpc_handlers.cc
+  rpc_handlers.h
+  pong_utils.cc
+  pong_utils.h
   ${PROJECT_NAME}_server.cc
 )
 

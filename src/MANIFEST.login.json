@@ -169,7 +169,7 @@
             "rpc_port": 8015,
             "rpc_nic_name": "eth0",
             "rpc_tags": [],
-            "rpc_message_logging_level": 1,
+            "rpc_message_logging_level": 0,
             "enable_rpc_reply_checker": true
           },
           "ZookeeperClient": {

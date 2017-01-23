@@ -33,8 +33,8 @@
             "io_service_threads_size": 4
           },
           "SessionService": {
-            "tcp_json_port": 8012,
-            "udp_json_port": 8013,
+            "tcp_json_port": 6012,
+            "udp_json_port": 6013,
             "http_json_port": 0,
             "tcp_protobuf_port": 0,
             "udp_protobuf_port": 0,
@@ -88,7 +88,7 @@
             "additional_configurations": []
           },
           "ApiService": {
-            "api_service_port": 8014,
+            "api_service_port": 6014,
             "api_service_event_tags_size": 1,
             "api_service_logging_level": 2
           },
@@ -165,13 +165,13 @@
           },
           "RpcService": {
             "rpc_enabled": true,
-            "rpc_threads_size": 4,
-            "rpc_port": 8015,
-            "rpc_nic_name": "eth0",
-            "rpc_tags": [],
-            "rpc_message_logging_level": 1,
-            "enable_rpc_reply_checker": true
-          },
+	    "rpc_threads_size": 4,
+	    "rpc_port": 6015,
+	    "rpc_nic_name": "eth0",
+	    "rpc_tags": [],
+	    "rpc_message_logging_level": 0,
+	    "enable_rpc_reply_checker": true
+	  },
           "ZookeeperClient": {
             "zookeeper_nodes": "localhost:2181"
           },
