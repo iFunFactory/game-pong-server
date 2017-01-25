@@ -67,6 +67,7 @@ namespace pong {
 		response["id"] = id;
 		response["winCount"] = user->GetWinCount();
 		response["loseCount"] = user->GetLoseCount();
+		response["curRecord"] = pong_lb::GetCurrentRecordById(id);
 
 		if (ret == 1) {
 			logger::PlayerLoggedIn(to_string(session->id()), id, WallClock::Now());

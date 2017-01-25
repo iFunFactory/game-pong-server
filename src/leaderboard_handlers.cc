@@ -11,6 +11,7 @@ DECLARE_string(app_flavor);
 namespace pong_lb {
 	const char *kPlayerCurWincount = "player_cur_wincount";
 	const char *kPlayerRecordWincount = "player_record_wincount";
+	const char *service_provider = "test_service_provider";
 
 	void OnNewRecordSubmitted(
 		const ScoreSubmissionRequest &request,
@@ -43,9 +44,26 @@ namespace pong_lb {
 		}
 	}
 
-	void UpdateNewRecord(const string &id, const int score) {
-		string service_provider = "test_service_provider";
+	int GetCurrentRecordById(const string &id) {
+		LeaderboardQueryRequest request(
+				kPlayerCurWincount,
+				service_provider,
+				id,
+				kDaily,
+				LeaderboardRange(LeaderboardRange::kNearby, 0, 0));
 
+		// 랭킹을 조회합니다.
+		LeaderboardQueryResponse response;
+		if (not GetLeaderboardSync(request, &response)) {
+			// system error
+			LOG(ERROR) << "leaderboard system error";
+			return 0;
+		}
+
+		return response.records[0].score;
+	}
+
+	void UpdateNewRecord(const string &id, const int score) {
 		ScoreSubmissionRequest request(
 				kPlayerRecordWincount,
 				service_provider,
@@ -90,7 +108,6 @@ namespace pong_lb {
 	}
 
 	void UpdateCurWincount(const string &id) {
-		string service_provider = "test_service_provider";
 		ScoreSubmissionRequest request(
 				kPlayerCurWincount,
 				service_provider,
@@ -115,8 +132,6 @@ namespace pong_lb {
 	}
 
 	void SetWincountToZero(const string &id) {
-		string service_provider = "test_service_provider";
-
 		ScoreSubmissionRequest request(
 				kPlayerCurWincount,
 				service_provider,

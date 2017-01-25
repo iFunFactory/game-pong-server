@@ -10,6 +10,7 @@
 
 namespace pong_lb {
 
+int GetCurrentRecordById(const string &id);
 void UpdateCurWincount(const string &id);
 void SetWincountToZero(const string &id);
 void GetListTopEight(const Ptr<Session> session);
