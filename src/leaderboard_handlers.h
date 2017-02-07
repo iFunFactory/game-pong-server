@@ -11,9 +11,9 @@
 namespace pong_lb {
 
 int GetCurrentRecordById(const string &id);
-void UpdateCurWincount(const string &id);
-void SetWincountToZero(const string &id);
-void GetListTopEight(const Ptr<Session> session);
+void IncreaseCurWincount(const string &id);
+void ResetCurWincount(const string &id);
+void GetTopEightList(const Ptr<Session> session);
 
 }  // namespace pong_lb
 

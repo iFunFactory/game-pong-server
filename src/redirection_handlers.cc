@@ -1,4 +1,4 @@
-#include "pong_utils.h"
+#include "redirection_handlers.h"
 
 #include <funapi.h>
 
@@ -7,7 +7,7 @@
 
 DECLARE_string(app_flavor);
 
-namespace pong_util {
+namespace pong_redirection {
 
 	void MoveServerByTag(const Ptr<Session> session, const string &tag) {
 		string id;
@@ -29,7 +29,6 @@ namespace pong_util {
 				LOG(INFO) << "[" << FLAGS_app_flavor << "] Client redirecting is failed!" << id;
 				// 해당 서버가 없거나, 로그인되지 않았거나 한 경우, 실패하며, 여기서 처리
 			} else {
-				//session->SetContext(sessionContext);
 				LOG(INFO) << "[" << FLAGS_app_flavor << "] Redirecting message sent to " << id << " go to " << tag << "server";
 			}
 			break;

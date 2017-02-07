@@ -8,7 +8,7 @@
 #include "pong_rpc_messages.pb.h"
 #include "pong_types.h"
 
-namespace pong_util {
+namespace pong_redirection {
 
         void MoveServerByTag(const Ptr<Session> session, const string &tag);
 

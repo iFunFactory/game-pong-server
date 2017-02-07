@@ -14,8 +14,8 @@ set(
   leaderboard_handlers.h
   rpc_handlers.cc
   rpc_handlers.h
-  pong_utils.cc
-  pong_utils.h
+  redirection_handlers.cc
+  redirection_handlers.h
   ${PROJECT_NAME}_server.cc
 )
 

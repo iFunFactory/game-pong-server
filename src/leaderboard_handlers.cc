@@ -13,6 +13,25 @@ namespace pong_lb {
 	const char *kPlayerRecordWincount = "player_record_wincount";
 	const char *service_provider = "test_service_provider";
 
+	int GetCurrentRecordById(const string &id) {
+		LeaderboardQueryRequest request(
+				kPlayerCurWincount,
+				service_provider,
+				id,
+				kDaily,
+				LeaderboardRange(LeaderboardRange::kNearby, 0, 0));
+
+		// 랭킹을 조회합니다.
+		LeaderboardQueryResponse response;
+		if (not GetLeaderboardSync(request, &response)) {
+			LOG(ERROR) << "leaderboard system error";
+			return 0;
+		}
+
+		// 현재 연승 수를 반환합니다.
+		return response.records[0].score;
+	}
+
 	void OnNewRecordSubmitted(
 		const ScoreSubmissionRequest &request,
 		const ScoreSubmissionResponse &response,
@@ -44,25 +63,6 @@ namespace pong_lb {
 		}
 	}
 
-	int GetCurrentRecordById(const string &id) {
-		LeaderboardQueryRequest request(
-				kPlayerCurWincount,
-				service_provider,
-				id,
-				kDaily,
-				LeaderboardRange(LeaderboardRange::kNearby, 0, 0));
-
-		// 랭킹을 조회합니다.
-		LeaderboardQueryResponse response;
-		if (not GetLeaderboardSync(request, &response)) {
-			// system error
-			LOG(ERROR) << "leaderboard system error";
-			return 0;
-		}
-
-		return response.records[0].score;
-	}
-
 	void UpdateNewRecord(const string &id, const int score) {
 		ScoreSubmissionRequest request(
 				kPlayerRecordWincount,
@@ -75,7 +75,7 @@ namespace pong_lb {
 		SubmitScore(request, handler);
 	}
 
-	void OnCurWincountSubmitted(
+	void OnIncreaseCurWincountSubmitted(
 			const ScoreSubmissionRequest &request,
 			const ScoreSubmissionResponse &response,
 			const bool &error) {
@@ -84,7 +84,7 @@ namespace pong_lb {
 			return;
 		}
 
-		LOG(INFO) << "[" << FLAGS_app_flavor << "] current score: " << response.new_score;
+		LOG(INFO) << "[" << FLAGS_app_flavor << "] id : " << request.player_account.id() << " current score: " << response.new_score;
 
 		switch (response.result) {
 			case kNewRecord: {
@@ -107,7 +107,7 @@ namespace pong_lb {
 		UpdateNewRecord(request.player_account.id(), response.new_score);
 	}
 
-	void UpdateCurWincount(const string &id) {
+	void IncreaseCurWincount(const string &id) {
 		ScoreSubmissionRequest request(
 				kPlayerCurWincount,
 				service_provider,
@@ -115,11 +115,11 @@ namespace pong_lb {
 				1,
 				ScoreSubmissionRequest::kIncrement);
 
-		ScoreSubmissionResponseHandler handler = OnCurWincountSubmitted;
+		ScoreSubmissionResponseHandler handler = OnIncreaseCurWincountSubmitted;
 		SubmitScore(request, handler);
 	}
 
-	void OnWincountToZeroSubmitted(
+	void OnResetCurWincountSubmitted(
 			const ScoreSubmissionRequest &request,
 			const ScoreSubmissionResponse &response,
 			const bool &error) {
@@ -127,11 +127,9 @@ namespace pong_lb {
 			LOG(ERROR) << "[" << FLAGS_app_flavor << "] leaderboard system error";
 			return;
 		}
-
-//		 BOOST_ASSERT(false);
 	}
 
-	void SetWincountToZero(const string &id) {
+	void ResetCurWincount(const string &id) {
 		ScoreSubmissionRequest request(
 				kPlayerCurWincount,
 				service_provider,
@@ -139,13 +137,12 @@ namespace pong_lb {
 				0,
 				ScoreSubmissionRequest::kOverwriting);
 
-		LOG(INFO) << id;
 
-		ScoreSubmissionResponseHandler handler = OnWincountToZeroSubmitted;
+		ScoreSubmissionResponseHandler handler = OnResetCurWincountSubmitted;
 		SubmitScore(request, handler);
 	}
 
-	void OnResponse(
+	void OnGetTopEightList(
 			const Ptr<Session> session,
 			const LeaderboardQueryRequest &request,
 			const LeaderboardQueryResponse &response,
@@ -170,14 +167,14 @@ namespace pong_lb {
 	}
 
 
- 	void GetListTopEight(const Ptr<Session> session) {
+	void GetTopEightList(const Ptr<Session> session) {
 		LeaderboardQueryRequest request(
 			kPlayerRecordWincount,
 			kDaily,
 			LeaderboardRange(LeaderboardRange::kFromTop, 0, 7),
 			LeaderboardQueryRequest::kStdCompetition);
 
-		LeaderboardQueryResponseHandler handler = bind(&OnResponse, session, _1, _2, _3);
+		LeaderboardQueryResponseHandler handler = bind(&OnGetTopEightList, session, _1, _2, _3);
 		GetLeaderboard(request, handler);
 	}
 } // namespace pong_lb

@@ -1,7 +1,7 @@
 #include "event_handlers.h"
 #include "leaderboard_handlers.h"
 #include "rpc_handlers.h"
-#include "pong_utils.h"
+#include "redirection_handlers.h"
 
 #include <funapi.h>
 #include <glog/logging.h>
@@ -23,16 +23,6 @@ namespace pong {
 		logger::SessionClosed(to_string(session->id()), WallClock::Now());
 	}
 
-	void AsyncLogoutCallback(const string &id, const Ptr<Session> &session, bool ret)
-	{
-		if (ret == 1) {
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] logout succeed : " << id;
-		}
-		else {
-			LOG(WARNING) << "[" << FLAGS_app_flavor << "] logout failed : " << id;
-		}
-	}
-
 	void UpdateMatchRecord(const string& winnerId, const string& loserId)
 	{
 		Ptr<User> winner = User::FetchById(winnerId);
@@ -50,6 +40,16 @@ namespace pong {
 
 		winner->SetWinCount(winner->GetWinCount() + 1);
 		loser->SetLoseCount(loser->GetLoseCount() + 1);
+	}
+
+	void AsyncLogoutCallback(const string &id, const Ptr<Session> &session, bool ret)
+	{
+		if (ret == 1) {
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] logout succeed : " << id;
+		}
+		else {
+			LOG(WARNING) << "[" << FLAGS_app_flavor << "] logout failed : " << id;
+		}
 	}
 
 	void AsyncLoginCallback(const string &id, const Ptr<Session> &session, bool ret) {
@@ -74,7 +74,7 @@ namespace pong {
 			response["result"] = "ok";
 			session->AddToContext("id", id);
 			// 로그인에 성공하면 로비서버로 이동합니다.
-			pong_util::MoveServerByTag(session, "lobby");
+			pong_redirection::MoveServerByTag(session, "lobby");
 		}
 		else {
 			// 로그인 실패
@@ -98,10 +98,9 @@ namespace pong {
 		Json msg;
 		msg["result"] = "nop";
 
-		LOG(INFO) << "[" << FLAGS_app_flavor << "]Try authentication...";
+		LOG(INFO) << "[" << FLAGS_app_flavor << "]Try FB authentication...";
 		if (error) {
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] authentication error";
-			LOG(ERROR) << "[" << FLAGS_app_flavor << "] authentication system error";
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] FB authentication error";
 			msg["msg"] = "FB autentication error";
 			session->SendMessage("login", msg, kDefaultEncryption, kTcp);
 			return;
@@ -144,9 +143,9 @@ namespace pong {
 				string myId;
 				session->GetFromContext("id", &myId);
 				UpdateMatchRecord(opponentId, myId);
-				pong_lb::UpdateCurWincount(opponentId);
-				pong_lb::SetWincountToZero(myId);
-				pong_util::MoveServerByTag(opponentSession, "lobby");
+				pong_lb::IncreaseCurWincount(opponentId);
+				pong_lb::ResetCurWincount(myId);
+				pong_redirection::MoveServerByTag(opponentSession, "lobby");
 
 				Json message;
 				message["result"] = "win";
@@ -185,15 +184,16 @@ namespace pong {
 		}
 	}
 
-	// 매치 취소를 요청하는 핸들러입니다.
+	// 매치 메이킹 취소 요청을 수행합니다.
 	void OnCancelRequested(const Ptr<Session> &session, const Json &message) {
 		pong_rpc::CancelMatchmakingRpc(session);
-		// matchmaking 취소를 요청합니다.
 	}
 
-        void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
+	// 매치 메이킹 요청을 수행합니다.
+       void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
 		pong_rpc::MatchmakingRpc(session);
         }
+
 	// 매칭 성공 후, 게임을 플레이할 준비가 되면 클라이언트는 ready를 보냅니다.
 	void OnReadySignal(const Ptr<Session> &session, const Json &message) {
 		session->AddToContext("ready", 1);
@@ -249,23 +249,23 @@ namespace pong {
 			Json winMessage;
 			winMessage["result"] = "win";
 			opponentSession->SendMessage("result", winMessage);
-			pong_lb::UpdateCurWincount(opponentId);
+			pong_lb::IncreaseCurWincount(opponentId);
 		}
 		// 패배 확인 메세지를 보냅니다.
 		session->SendMessage("result", message);
-		pong_lb::SetWincountToZero(myId);
+		pong_lb::ResetCurWincount(myId);
 
 		// 각각 상대방에 대한 정보를 삭제합니다.
 		opponentSession->DeleteFromContext("opponent");
 		session->DeleteFromContext("opponent");
 
 		// 두 플레이어를 lobby서버로 이동시킵니다.
-		pong_util::MoveServerByTag(opponentSession, "lobby");
-		pong_util::MoveServerByTag(session, "lobby");
+		pong_redirection::MoveServerByTag(opponentSession, "lobby");
+		pong_redirection::MoveServerByTag(session, "lobby");
 	}
 
 	void OnRanklistRequested(const Ptr<Session> &session, const Json &message) {
-		pong_lb::GetListTopEight(session);
+		pong_lb::GetTopEightList(session);
 	}
 
 	// regist handlers
@@ -287,7 +287,7 @@ namespace pong {
 		}
 
 		{
-			pong_util::RegisterRedirectionHandlers();
+			pong_redirection::RegisterRedirectionHandlers();
 		}
 
 		{

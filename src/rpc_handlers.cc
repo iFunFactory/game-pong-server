@@ -1,5 +1,5 @@
 #include "rpc_handlers.h"
-#include "pong_utils.h"
+#include "redirection_handlers.h"
 
 #include <funapi.h>
 #include <glog/logging.h>
@@ -27,7 +27,6 @@ namespace pong_rpc {
 		string id = echo_context.id();
 		string msg = echo_context.message();
 
-		LOG(INFO) << "[" << FLAGS_app_flavor  << "] RPC Message From " << sender << "  user id is : " << id << " result msg : " << msg << "  player A is : " << playerA << "  player B is : " << playerB;
 		Ptr<Session> session = AccountManager::FindLocalSession(id);
 
 		Json response;
@@ -45,9 +44,11 @@ namespace pong_rpc {
 			session->AddToContext("matching", "done");
 			session->AddToContext("ready", 0);
 
-			pong_util::MoveServerByTag(session, "game");
+			LOG(INFO) << "[" << FLAGS_app_flavor  << "] Succeed in matchmaking. id : " << id;
+			pong_redirection::MoveServerByTag(session, "game");
 		}
 		else {
+			LOG(INFO) << "[" << FLAGS_app_flavor  << "] Fail to matchmaking. id : " << id;
 			// 타임아웃이 되거나 중복 요청인 경우 실패합니다.
 			session->AddToContext("matching", "failed");
 		}
@@ -190,11 +191,11 @@ namespace pong_rpc {
                 else
                 {
                         msg->set_message("Cancel");
-                }
+			LOG(INFO) << "[" << FLAGS_app_flavor  << "] Matchmaking id cancelled. id : " << id;
+		}
 
 		Rpc::Call(target, request);
 
-                LOG(INFO) << "[" << FLAGS_app_flavor  << "] match cancelled : " + id;
         }
 
 	// 'cancel_match' 요청이 도착했을 때 호출될 핸들러
@@ -219,9 +220,8 @@ namespace pong_rpc {
 
 		finisher(response);
 		// matchmaking 취소를 요청합니다.
+		LOG(INFO) << "Request cancel matchmaking...";
 		MatchmakingClient::CancelMatchmaking(0, id, MatchmakingCancelled);
-
-		LOG(INFO) << "[" << FLAGS_app_flavor  << "] cancel req id : " << id;
 	}
 
 	// 'cancel_match' 응답이 도착했을 때 호출될 Callback
