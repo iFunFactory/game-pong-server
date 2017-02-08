@@ -86,7 +86,7 @@ $ sudo service zookeeper start
 이제 빌드 환경을 구축해 보겠습니다. game-pong-server를 다운로드 시 `git clone` 을 수행 혹은 압축을 해제한 `game-pong-server` 디렉터리가 보이는 디렉터리에서 다음의 명령어를 입력합니다.
 
 ```bash
-game-pong-server/setup_build_environment --type==makefile
+game-pong-server/setup_build_environment --type=makefile
 ```
 
 명령어를 실행시키면 빌드가 진행됨을 알리는 로그가 출력됩니다. 빌드가 완료되면 `pong-build` 폴더가 새롭게 생성됩니다. `pong-build` 디렉터리에는 `debug`와 `release` 디렉터리가 새로 생성되어있는데, 각각의 디렉터리에서 debug버전 빌드와 release버전의 빌드를 할 수 있습니다.
