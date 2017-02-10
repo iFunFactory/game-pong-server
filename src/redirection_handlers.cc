@@ -16,6 +16,12 @@ namespace pong_redirection {
 		Rpc::PeerMap servers;
 		Rpc::GetPeersWithTag(&servers, tag);
 
+		if(servers.size() == 0) {
+			string msg = "Fail to redirect. the " + tag + " server is not running.";
+			LOG(INFO) << msg;
+			return;
+		}
+
 		for (Rpc::PeerMap::const_iterator itr = servers.begin(); itr != servers.end(); ++itr) {
 			const Rpc::PeerId &target = itr->first;
 
@@ -29,7 +35,7 @@ namespace pong_redirection {
 				LOG(INFO) << "[" << FLAGS_app_flavor << "] Client redirecting is failed!" << id;
 				// 해당 서버가 없거나, 로그인되지 않았거나 한 경우, 실패하며, 여기서 처리
 			} else {
-				LOG(INFO) << "[" << FLAGS_app_flavor << "] Redirecting message sent to " << id << " go to " << tag << "server";
+				LOG(INFO) << "[" << FLAGS_app_flavor << "] Redirecting message sent to " << id << " msg: move to " << tag << " server";
 			}
 			break;
 		}

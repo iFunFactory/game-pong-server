@@ -59,7 +59,7 @@ namespace pong {
 			LOG(INFO) << "[" << FLAGS_app_flavor << "] Create new user: " << id;
 			user = User::Create(id);
 		} else {
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] Already exist user";
+			LOG(INFO) << "[" << FLAGS_app_flavor << "] User already exists: " << id;
 		}
 
 		Json response;
@@ -168,6 +168,20 @@ namespace pong {
 
 	// 로그인 요청
 	void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
+		Rpc::PeerMap servers;
+		Rpc::GetPeersWithTag(&servers, "lobby");
+
+		if(servers.size() == 0) {
+			string msg =  "Fail to login. the lobby server is not running.";
+			LOG(INFO) << msg;
+
+			Json res;
+			res["result"] = "fail";
+			res["msg"] = msg;
+			session->SendMessage("login", res);
+			return;
+		}
+
 		string id = message["id"].GetString();
 		string type = message["type"].GetString();
 
@@ -191,7 +205,35 @@ namespace pong {
 
 	// 매치 메이킹 요청을 수행합니다.
        void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
-		pong_rpc::MatchmakingRpc(session);
+	       Rpc::PeerMap matchmakerServer;
+	       Rpc::GetPeersWithTag(&matchmakerServer, "matchmaker");
+
+	       if(matchmakerServer.size() == 0) {
+		       string msg =  "Fail to matchmaking. the matchmaker server is not running.";
+		       LOG(INFO) << msg;
+
+		       Json res;
+		       res["result"] = "fail";
+		       res["msg"] = msg;
+		       session->SendMessage("error", res);
+		       return;
+	       }
+
+		Rpc::PeerMap gameServer;
+		Rpc::GetPeersWithTag(&gameServer, "game");
+
+		if(gameServer.size() == 0) {
+			string msg =  "Fail to start game. the game server is not running.";
+			LOG(INFO) << msg;
+
+			Json res;
+			res["result"] = "fail";
+			res["msg"] = msg;
+			session->SendMessage("error", res);
+			return;
+		}
+
+	       pong_rpc::MatchmakingRpc(session);
         }
 
 	// 매칭 성공 후, 게임을 플레이할 준비가 되면 클라이언트는 ready를 보냅니다.

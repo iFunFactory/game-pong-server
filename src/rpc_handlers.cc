@@ -13,10 +13,6 @@ namespace pong_rpc {
 	// 'match_result' 요청이 도착했을 때 호출될 핸들러.
 	void OnMatchResultRpc(const Rpc::PeerId &sender, const Rpc::Xid &xid,
 			const Ptr<const FunRpcMessage> &request) {
-		if (FLAGS_app_flavor != "lobby") {
-			LOG(ERROR) << "[OnMatchResultRpc] function is not called on the lobby server";
-			return;
-		}
 
 		BOOST_ASSERT(request->HasExtension(match_context_rpc));
 		const MatchContextRpcMessage &echo = request->GetExtension(match_context_rpc);
@@ -60,11 +56,6 @@ namespace pong_rpc {
 			const MatchmakingClient::Match &match,
 			MatchmakingClient::MatchResult result) {
 
-		if (FLAGS_app_flavor != "matchmaker") {
-			LOG(ERROR) << "[MatchmakingCallback] function is not called on the matchmaker server";
-			return;
-		}
-
 		// 로비 서버를 찾습니다.
 		Rpc::PeerMap peers;
 		Rpc::GetPeersWithTag(&peers, "lobby");
@@ -106,10 +97,6 @@ namespace pong_rpc {
 	void OnMatchMakeRpc(const Rpc::PeerId &sender, const Rpc::Xid &xid,
 			const Ptr<const FunRpcMessage> &request,
 			const Rpc::ReadyBack &finisher) {
-		if (FLAGS_app_flavor != "matchmaker") {
-			LOG(ERROR) << "[OnMatchRpc] function is not called on the matchmaker server";
-			return;
-		}
 
 		BOOST_ASSERT(request->HasExtension(match_rpc));
 		const MatchRpcMessage &echo = request->GetExtension(match_rpc);
@@ -140,10 +127,6 @@ namespace pong_rpc {
 	// 'match_make'에 대한 응답이 도착했을 때 호출될 Callback
 	void MatchmakeRpcResponseCallback(const Rpc::PeerId &sender, const Rpc::Xid &xid,
 			const Ptr<const FunRpcMessage> &res) {
-		if (FLAGS_app_flavor != "lobby") {
-			LOG(ERROR) << "[MatchmakeRpcResponseCallback] function is not called on the lobby server";
-			return;
-		}
 
 		if (not res) {
 			LOG(ERROR) << "rpc call failed";
@@ -162,10 +145,6 @@ namespace pong_rpc {
 
 
 	void MatchmakingCancelled(const string &id, MatchmakingClient::CancelResult result) {
-		if (FLAGS_app_flavor != "matchmaker") {
-			LOG(ERROR) << "[OnCancelled] function is not called on the matchmaker server";
-			return;
-		}
 		// 로비 서버를 찾습니다.
 		Rpc::PeerMap peers;
 		Rpc::GetPeersWithTag(&peers, "lobby");
@@ -245,10 +224,6 @@ namespace pong_rpc {
 	// 'cancel_match_result' 요청이 도착했을 때 호출될 핸들러
 	void OnCancelMatchResultRpc(const Rpc::PeerId &sender, const Rpc::Xid &xid,
 			const Ptr<const FunRpcMessage> &request) {
-		if (FLAGS_app_flavor != "lobby") {
-			LOG(ERROR) << "[OnCancelMatchResultRpc] function is not called on the lobby server";
-			return;
-		}
 
 		BOOST_ASSERT(request->HasExtension(oneway_match_rpc));
 		const OnewayMatchRpcMessage &msg = request->GetExtension(oneway_match_rpc);
@@ -265,16 +240,12 @@ namespace pong_rpc {
 
 
 	void MatchingCancelledByTransportDetaching(const string &id, MatchmakingClient::CancelResult result) {
-                LOG(INFO) << "[" << FLAGS_app_flavor << "] MatchingCancelledByTransportDetaching : " << id;
-        }
+		LOG(INFO) << "[" << FLAGS_app_flavor << "] MatchingCancelledByTransportDetaching : " << id;
+	}
 
 	// 'cancel_match_by_tcp_detached' 요청이 도착했을 때 호출될 핸들러
 	void OnCancelMatchByTcpDetached(const Rpc::PeerId &sender, const Rpc::Xid &xid,
 			const Ptr<const FunRpcMessage> &request) {
-		if (FLAGS_app_flavor != "matchmaker") {
-			LOG(ERROR) << "[OnCancelMatchByTcpDetached] function is not called on the matchmaker server";
-			return;
-		}
 
 		BOOST_ASSERT(request->HasExtension(oneway_match_rpc));
 		const OnewayMatchRpcMessage &msg = request->GetExtension(oneway_match_rpc);
