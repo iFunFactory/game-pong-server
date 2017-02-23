@@ -87,7 +87,7 @@ $ sudo vim /etc/default/funapi-authenticator
 이후, 아래의 명령어를 입력하여 MANIFEST.json 파일을 열어주세요.
 
 ```bash
-$ sudo vim /usr/share/funapi-authenticator/manifests/src/MANIFEST.json
+$ sudo vim /usr/share/funapi-authenticator/default/manifests/MANIFEST.json
 ```
 
 `tcp_listen_port` 는 authenticator 클라이언트가 인증 에이전트로 접속하기 위한 port number입니다.
@@ -96,7 +96,7 @@ $ sudo vim /usr/share/funapi-authenticator/manifests/src/MANIFEST.json
 ...
 "arguments": {
   "tcp_listen_port" : 12800,
-  "http_listen_port" : 12801, // 이건?
+  "http_listen_port" : 12801,
   "bypass" : false,
   "ip_address_table_path" : "acl/ip_address_table"
 },
