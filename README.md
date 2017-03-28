@@ -124,7 +124,7 @@ $ sudo vim /game-pong-server/src/MANIFEST.login.json
 설정이 모두 완료된 후에는 다음 명령어를 통해 실행합니다.
 
 ```bash
-$ sudo service funapi-authenticator1 start
+$ sudo service funapi-authenticator start
 ```
 
 #### funapi-leaderboard 설치
