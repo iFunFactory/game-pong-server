@@ -53,7 +53,7 @@ set(GENERATE_UNITY_PROTOBUF_DLL false)
 # Please note that "default" is reserved for the default flavor.
 # If you enable APP_FLAVORS, you also have to have a manifest file for each flavor.
 # like src/MANIFEST.${flavor}.json (e.g., src/MANIFEST.game.json, ...)
-set(APP_FLAVORS login lobby matchmaker game)
+set(APP_FLAVORS lobby game matchmaker)
 
 # Sets if you want to include all flavors in a single package.
 #set(WANT_ONE_PACKAGE_FOR_ALL_FLAVORS true)

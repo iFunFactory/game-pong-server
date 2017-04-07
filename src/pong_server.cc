@@ -18,12 +18,11 @@ class PongServer : public Component {
 
     if (FLAGS_app_flavor == "lobby") {
       LOG(INFO) << "Install lobby server";
-    } else if (FLAGS_app_flavor == "login") {
-      LOG(INFO) << "Install login server";
     } else if (FLAGS_app_flavor == "matchmaker") {
       LOG(INFO) << "Install matchmaker  server";
       pong::StartMatchmakingServer();
     } else {
+      BOOST_ASSERT(FLAGS_app_flavor == "game");
       LOG(INFO) << "Install game server";
     }
 

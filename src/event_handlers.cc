@@ -68,74 +68,73 @@ Json MakeResponse(const string &result) {
 		}
 	}
 
-	void AsyncLoginCallback(const string &id, const Ptr<Session> &session, bool ret) {
+	void AsyncLoginCallback(const string &id, const Ptr<Session> &session,
+                          bool success) {
+    if (not success) {
+      // 로그인에 실패 응답을 보냅니다. 중복, 이중 로그인 등이 원인입니다.
+      LOG(INFO) << "Failed to login: id=" << id;
+      session->SendMessage("login", MakeResponse("nop", "fail to login"),
+                           kDefaultEncryption, kTcp);
+      return;
+    }
+
+    // User Object 를 가져옵니다.
 		Ptr<User> user = User::FetchById(id);
 
-		if(not user) {
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] Create new user: " << id;
-			user = User::Create(id);
-		} else {
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] User already exists: " << id;
-		}
+    if (not user) {
+      // 새로운 유저를 생성합니다.
+      User::Create(id);
+      LOG(INFO) << "Registered new user: id=" << id;
+    }
+    LOG(INFO) << "Succeed to login: id=" << id;
 
-		Json response;
+    // 로그인 Activitiy Log 를 남깁니다.
+	  logger::PlayerLoggedIn(to_string(session->id()), id, WallClock::Now());
 
+    // Session 에 Login 한 ID 를 저장합니다.
+    session->AddToContext("id", id);
+
+    // 응답을 보냅니다.
+		Json response = MakeResponse("ok");
 		response["id"] = id;
 		response["winCount"] = user->GetWinCount();
 		response["loseCount"] = user->GetLoseCount();
 		response["curRecord"] = pong_lb::GetCurrentRecordById(id);
 
-		if (ret == 1) {
-			logger::PlayerLoggedIn(to_string(session->id()), id, WallClock::Now());
-			response["result"] = "ok";
-			session->AddToContext("id", id);
-			// 로그인에 성공하면 로비서버로 이동합니다.
-			pong_redirection::MoveServerByTag(session, "lobby");
-		}
-		else {
-			// 로그인 실패
-			response["result"] = "nop";
-			response["msg"] = "Fail to login.";
-			LOG(WARNING) << "[" << FLAGS_app_flavor << "] login failed : " << id;
-			// 중복 아이디 정책: 동일한 아이디가 있다면 이전 로그인을 취소합니다.
-			AccountManager::SetLoggedOutAsync(id, AsyncLogoutCallback);
-			// TODO: 이전 세션 처리가 필요합니다.
-		}
-        	session->SendMessage("login", response, kDefaultEncryption, kTcp);
+   	session->SendMessage("login", response, kDefaultEncryption, kTcp);
 	}
 
-	void FBAuthenticate(
-		const string &fb_uid,
-		const Ptr<Session> &session,
+	void OnFacebookAuthenticated(
+		const string &fb_uid, const Ptr<Session> &session,
 		const AccountAuthenticationRequest &request,
-		const AccountAuthenticationResponse &response,
-		const bool &error) {
+		const AccountAuthenticationResponse &response, const bool &error) {
+    if (error) {
+      // 인증에 오류가 있습니다. 장애 오류입니다.
+      LOG(ERROR) << "Failed to authenticate. Facebook authentication error: "
+                 << "id=" << fb_uid;
+      session->SendMessage("login",
+                           MakeResponse("nop", "facebook authentication error"),
+                           kDefaultEncryption, kTcp);
+      return;
+    }
 
-		Json msg;
-		msg["result"] = "nop";
+    if (not response.success) {
+      // 인증에 실패했습니다. 올바르지 않은 access token 입니다.
+      LOG(INFO) << "Failed to authenticate. Wrong Facebook access token: "
+                << "id=" << fb_uid;
+      string fail_message = "facebook authentication failed: " +
+                            response.reason_description;
+      session->SendMessage("login", MakeResponse("nop", fail_message),
+                           kDefaultEncryption, kTcp);
+      return;
+    }
 
-		LOG(INFO) << "[" << FLAGS_app_flavor << "]Try FB authentication...";
-		if (error) {
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] FB authentication error";
-			msg["msg"] = "FB autentication error";
-			session->SendMessage("login", msg, kDefaultEncryption, kTcp);
-			return;
-		}
-
-		// 오류는 발생하지 않았지만, 인증 결과가 실패한 경우입니다.
-		// 클라이언트가 가짜로 access token 을 만들어 보내는 경우 등이 포함됩니다.
-		if (not response.success) {
-			// login failure
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] FB authentication failed. code(" << response.reason_code << ")," << "description(" << response.reason_description << ")";
-			msg["msg"] = "FB authentication failed. description(" + response.reason_description + ")";
-
-			session->SendMessage("login", msg, kDefaultEncryption, kTcp);
-			return;
-		}
 		// 인증에 성공했습니다.
+    LOG(INFO) << "Succeed to authenticate facebook account: id=" << fb_uid;
 
-		LOG(INFO) << "[" << FLAGS_app_flavor << "] FB authentication success: " << fb_uid;
-		AccountManager::CheckAndSetLoggedInAsync(fb_uid, session, AsyncLoginCallback);
+    // 이어서 로그인 처리를 진행합니다.
+		AccountManager::CheckAndSetLoggedInAsync(fb_uid, session,
+                                             AsyncLoginCallback);
 	}
 
 	// transport detached
@@ -193,32 +192,18 @@ Json MakeResponse(const string &result) {
 
 	// 로그인 요청
 	void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
-		Rpc::PeerMap servers;
-		Rpc::GetPeersWithTag(&servers, "lobby");
-
-		if(servers.size() == 0) {
-			string msg =  "Fail to login. the lobby server is not running.";
-			LOG(INFO) << msg;
-
-			Json res;
-			res["result"] = "fail";
-			res["msg"] = msg;
-			session->SendMessage("login", res);
-			return;
-		}
-
 		string id = message["id"].GetString();
 		string type = message["type"].GetString();
 
-		if(type.compare("fb") == 0){
+		if(type == "fb") {
+      // Facebook 인증을 먼저 합니다.
 			string access_token = message["access_token"].GetString();
-
-			AuthenticationKey auth_key = MakeFacebookAuthenticationKey(access_token);
-                	AccountAuthenticationRequest req("Facebook", id, auth_key);
-	                AuthenticationResponseHandler callback = bind(&FBAuthenticate, id, session, _1, _2, _3);
-	                Authenticate(req, callback);
-
+      AccountAuthenticationRequest request(
+          "Facebook", id, MakeFacebookAuthenticationKey(access_token));
+      Authenticate(request,
+                   bind(&OnFacebookAuthenticated, id, session, _1, _2, _3));
 		} else {
+      // Guest 는 별도의 인증 없이 로그인 합니다.
 			AccountManager::CheckAndSetLoggedInAsync(id, session, AsyncLoginCallback);
 		}
 	}
