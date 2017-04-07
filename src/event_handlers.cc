@@ -28,17 +28,6 @@ Json MakeResponse(const string &result) {
   return response;
 }
 
-
-	// session opened
-	void OnSessionOpened(const Ptr<Session> &session) {
-		logger::SessionOpened(to_string(session->id()), WallClock::Now());
-	}
-
-	// session closed
-	void OnSessionClosed(const Ptr<Session> &session, SessionCloseReason reason) {
-		logger::SessionClosed(to_string(session->id()), WallClock::Now());
-	}
-
 	void UpdateMatchRecord(const string& winnerId, const string& loserId)
 	{
 		Ptr<User> winner = User::FetchById(winnerId);
@@ -58,23 +47,120 @@ Json MakeResponse(const string &result) {
 		loser->SetLoseCount(loser->GetLoseCount() + 1);
 	}
 
-	void AsyncLogoutCallback(const string &id, const Ptr<Session> &session, bool ret)
-	{
-		if (ret == 1) {
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] logout succeed : " << id;
-		}
-		else {
-			LOG(WARNING) << "[" << FLAGS_app_flavor << "] logout failed : " << id;
-		}
+
+void FreeUser(const Ptr<Session> &session) {
+  // 대전 상대가 있는지 확인합니다.
+  string opponentId;
+  session->GetFromContext("opponent", &opponentId);
+  if (!opponentId.empty())
+  {
+    // 대전 상대가 있는 경우, 상대에게 승리 메세지를 보냅니다.
+    Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
+    if (opponentSession && opponentSession->IsTransportAttached())
+    {
+      string myId;
+      session->GetFromContext("id", &myId);
+      Event::Invoke(bind(&UpdateMatchRecord, opponentId, myId));
+      pong_lb::IncreaseCurWincount(opponentId);
+      pong_lb::ResetCurWincount(myId);
+      pong_redirection::MoveServerByTag(opponentSession, "lobby");
+
+      Json message;
+      message["result"] = "win";
+      opponentSession->SendMessage("result", message, kDefaultEncryption, kTcp);
+    }
+  }
+
+  // 매치메이킹이 진행중인지 확인합니다.
+  string matchingContext;
+  session->GetFromContext("matching", &matchingContext);
+  if (!matchingContext.empty() && matchingContext == "doing")
+  {
+    // 매치메이킹이 진행 중인 경우, 취소합니다.
+    string id;
+    session->GetFromContext("id", &id);
+    // Matchmaking cancel 결과를 처리할 람다 함수입니다.
+    auto cancel_cb = [](const string &player_id,
+                        MatchmakingClient::CancelResult result) {
+      if (result == MatchmakingClient::kCRSuccess) {
+        LOG(INFO) << "Succeed to cancel matchmaking by TCP disconnecting: "
+                  << player_id;
+      } else {
+        LOG(INFO) << "Failed to cancel matchmaking by TCP disconnecting: "
+                  << player_id;
+      }
+    };
+
+    MatchmakingClient::CancelMatchmaking(kMatch1vs1, id, cancel_cb);
+  }
+
+  // 로그아웃하고 세션을 종료합니다.
+  string id = AccountManager::FindLocalAccount(session);
+  if (not id.empty()) {
+    auto logout_cb = [](const string &id, const Ptr<Session> &session,
+                        bool success) {
+      if (success) {
+        LOG(INFO) << "Logged out(local) by session close: id=" << id;
+      }
+    };
+    AccountManager::SetLoggedOutAsync(id, logout_cb);
+  }
+
+  // Session Context 를 초기화 합니다.
+  session->SetContext(Json());
+}
+
+	// session opened
+	void OnSessionOpened(const Ptr<Session> &session) {
+		logger::SessionOpened(to_string(session->id()), WallClock::Now());
+	}
+
+	// session closed
+	void OnSessionClosed(const Ptr<Session> &session, SessionCloseReason reason) {
+		logger::SessionClosed(to_string(session->id()), WallClock::Now());
+    FreeUser(session);
 	}
 
 	void AsyncLoginCallback(const string &id, const Ptr<Session> &session,
                           bool success) {
     if (not success) {
-      // 로그인에 실패 응답을 보냅니다. 중복, 이중 로그인 등이 원인입니다.
+      // 로그인에 실패 응답을 보냅니다. 중복 로그인이 원인입니다.
+      // (1. 같은 ID 로 이미 다른 Session 이 로그인 했거나,
+      //  2. 이 Session 이 이미 로그인 되어 있는 경우)
       LOG(INFO) << "Failed to login: id=" << id;
       session->SendMessage("login", MakeResponse("nop", "fail to login"),
                            kDefaultEncryption, kTcp);
+
+      // 아래 로그아웃 처리를 한 후 자동으로 로그인 시킬 수 있지만
+      // 일단 클라이언트에서 다시 시도하도록 합니다.
+
+      // 1. 이 ID 의 로그인을 풀어버립니다.(로그아웃)
+      auto logout_cb = [](const string &id, const Ptr<Session> &session,
+                          bool success) {
+        if (success) {
+          if (session) {
+            // 같은 서버에 로그인 되어 있었습니다.
+            LOG(INFO) << "Logged out(local) by duplicated login request: "
+                      << "id=" << id;
+            session->Close();
+          } else {
+            // 다른 서버에 로그인 되어 있었습니다.
+            // 해당 서버의 OnLoggedOutRemotely() 에서 처리합니다.
+            LOG(INFO) << "Logged out(remote) by duplicated login request: "
+                      << "id=" << id;
+          }
+        }
+      };
+      AccountManager::SetLoggedOutGlobalAsync(id, logout_cb);
+
+      // 2. 이 Session 의 로그인을 풀어버립니다.(로그아웃)
+      string id_logged_in = AccountManager::FindLocalAccount(session);
+      if (not id_logged_in.empty()) {
+        // OnSessionClosed 에서 처리합니다.
+        LOG(INFO) << "Close session. by duplicated login request: id=" << id;
+        session->Close();
+      }
+
       return;
     }
 
@@ -139,53 +225,9 @@ Json MakeResponse(const string &result) {
 
 	// transport detached
 	void OnTransportTcpDetached(const Ptr<Session> &session) {
-		LOG(INFO) << "[" << FLAGS_app_flavor << "] OnTransportTcpDetached : " << to_string(session->id()) << " : " << AccountManager::FindLocalAccount(session);
-		// 대전 상대가 있는지 확인합니다.
-		string opponentId;
-		session->GetFromContext("opponent", &opponentId);
-		if (!opponentId.empty())
-		{
-			// 대전 상대가 있는 경우, 상대에게 승리 메세지를 보냅니다.
-			Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-			if (opponentSession && opponentSession->IsTransportAttached())
-			{
-				string myId;
-				session->GetFromContext("id", &myId);
-				UpdateMatchRecord(opponentId, myId);
-				pong_lb::IncreaseCurWincount(opponentId);
-				pong_lb::ResetCurWincount(myId);
-				pong_redirection::MoveServerByTag(opponentSession, "lobby");
-
-				Json message;
-				message["result"] = "win";
-				opponentSession->SendMessage("result", message, kDefaultEncryption, kTcp);
-			}
-		}
-		// 매치메이킹이 진행중인지 확인합니다.
-		string matchingContext;
-		session->GetFromContext("matching", &matchingContext);
-		if (!matchingContext.empty() && matchingContext == "doing")
-		{
-			// 매치메이킹이 진행 중인 경우, 취소합니다.
-      string id;
-      session->GetFromContext("id", &id);
-      // Matchmaking cancel 결과를 처리할 람다 함수입니다.
-      auto cancel_cb = [](const string &player_id,
-                          MatchmakingClient::CancelResult result) {
-        if (result == MatchmakingClient::kCRSuccess) {
-          LOG(INFO) << "Succeed to cancel matchmaking by TCP disconnecting: "
-                    << player_id;
-        } else {
-          LOG(INFO) << "Failed to cancel matchmaking by TCP disconnecting: "
-                    << player_id;
-        }
-      };
-
-      MatchmakingClient::CancelMatchmaking(kMatch1vs1, id, cancel_cb);
-		}
-
-		// 로그아웃하고 세션을 종료합니다.
-		AccountManager::SetLoggedOut(AccountManager::FindLocalAccount(session));
+    LOG(INFO) << "TCP disconnected: id="
+              << AccountManager::FindLocalAccount(session);
+    FreeUser(session);
 	}
 
 	// 메세지 핸들러
@@ -394,6 +436,13 @@ Json MakeResponse(const string &result) {
 		pong_lb::GetTopEightList(session);
 	}
 
+
+  void OnLoggedOutRemotely(const string &id, const Ptr<Session> &session) {
+    // 다른 서버에서 로그아웃시켰습니다.
+    LOG(INFO) << "Close session. by logged out remotely: id=" << id;
+    session->Close();
+  }
+
 	// regist handlers
 	void RegisterEventHandlers() {
 		{
@@ -411,6 +460,10 @@ Json MakeResponse(const string &result) {
 			HandlerRegistry::Register("cancelmatch", OnCancelRequested);
 			HandlerRegistry::Register("ranklist", OnRanklistRequested);
 		}
+
+    {
+      AccountManager::RegisterRemoteLogoutHandler(OnLoggedOutRemotely);
+    }
 
 		{
 			pong_redirection::RegisterRedirectionHandlers();

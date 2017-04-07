@@ -14,6 +14,7 @@
 namespace pong {
 
 void RegisterEventHandlers();
+void FreeUser(const Ptr<Session> &session);
 
 }  // namespace pong
 
