@@ -12,8 +12,8 @@ set(
   event_handlers.h
   leaderboard_handlers.cc
   leaderboard_handlers.h
-  rpc_handlers.cc
-  rpc_handlers.h
+  matchmaking.h
+  matchmaking.cc
   redirection_handlers.cc
   redirection_handlers.h
   ${PROJECT_NAME}_server.cc

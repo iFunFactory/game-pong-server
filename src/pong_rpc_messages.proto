@@ -10,36 +10,13 @@
 // use relative path like this:
 import "funapi/distribution/fun_rpc_message.proto";
 
-message OnewayRpcMessage {
-  optional string message = 1;
-}
 
 // Your specific message class.
 message EchoRpcMessage {
-  optional OnewayRpcMessage request = 1;
-  optional OnewayRpcMessage reply = 2;
+  optional string message = 1;
 }
 
-message OnewayMatchRpcMessage {
-  optional string id = 1;
-  optional string message = 2;
-}
-
-message MatchRpcMessage {
-   optional OnewayMatchRpcMessage request = 1;
-   optional OnewayMatchRpcMessage response = 2;
-}
-
-message MatchContextRpcMessage {
-  optional string player_a = 1;
-  optional string player_b = 2;
-  optional OnewayMatchRpcMessage context = 3;
-}
 
 extend FunRpcMessage {
-  optional OnewayRpcMessage oneway_rpc = 32;
-  optional EchoRpcMessage echo_rpc = 33;
-  optional OnewayMatchRpcMessage oneway_match_rpc = 34;
-  optional MatchRpcMessage match_rpc = 35;
-  optional MatchContextRpcMessage match_context_rpc = 36;
+  optional EchoRpcMessage echo_rpc = 32;
 }

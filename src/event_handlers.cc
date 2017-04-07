@@ -1,17 +1,33 @@
 #include "event_handlers.h"
 #include "leaderboard_handlers.h"
-#include "rpc_handlers.h"
 #include "redirection_handlers.h"
 
 #include <funapi.h>
 #include <glog/logging.h>
 
+#include "matchmaking.h"
 #include "pong_loggers.h"
 #include "pong_messages.pb.h"
+#include "pong_types.h"
 
 DECLARE_string(app_flavor);
 
 namespace pong {
+
+Json MakeResponse(const string &result, const string &message) {
+  Json response;
+  response["result"] = result;
+  response["message"] = message;
+  return response;
+}
+
+
+Json MakeResponse(const string &result) {
+  Json response;
+  response["result"] = result;
+  return response;
+}
+
 
 	// session opened
 	void OnSessionOpened(const Ptr<Session> &session) {
@@ -122,12 +138,6 @@ namespace pong {
 		AccountManager::CheckAndSetLoggedInAsync(fb_uid, session, AsyncLoginCallback);
 	}
 
-
-	// 매치메이킹 중 클라이언트와의 연결이 끊어졌을 때의 콜백입니다.
-	void MatchingCancelledByTransportDetaching(const string &id, MatchmakingClient::CancelResult result) {
-		LOG(INFO) << "[" << FLAGS_app_flavor << "] MatchingCancelledByTransportDetaching : " << id;
-	}
-
 	// transport detached
 	void OnTransportTcpDetached(const Ptr<Session> &session) {
 		LOG(INFO) << "[" << FLAGS_app_flavor << "] OnTransportTcpDetached : " << to_string(session->id()) << " : " << AccountManager::FindLocalAccount(session);
@@ -158,8 +168,23 @@ namespace pong {
 		if (!matchingContext.empty() && matchingContext == "doing")
 		{
 			// 매치메이킹이 진행 중인 경우, 취소합니다.
-			pong_rpc::CancelMatchmakingRpcByTcpDetached(session);
+      string id;
+      session->GetFromContext("id", &id);
+      // Matchmaking cancel 결과를 처리할 람다 함수입니다.
+      auto cancel_cb = [](const string &player_id,
+                          MatchmakingClient::CancelResult result) {
+        if (result == MatchmakingClient::kCRSuccess) {
+          LOG(INFO) << "Succeed to cancel matchmaking by TCP disconnecting: "
+                    << player_id;
+        } else {
+          LOG(INFO) << "Failed to cancel matchmaking by TCP disconnecting: "
+                    << player_id;
+        }
+      };
+
+      MatchmakingClient::CancelMatchmaking(kMatch1vs1, id, cancel_cb);
 		}
+
 		// 로그아웃하고 세션을 종료합니다.
 		AccountManager::SetLoggedOut(AccountManager::FindLocalAccount(session));
 	}
@@ -200,41 +225,115 @@ namespace pong {
 
 	// 매치 메이킹 취소 요청을 수행합니다.
 	void OnCancelRequested(const Ptr<Session> &session, const Json &message) {
-		pong_rpc::CancelMatchmakingRpc(session);
+    // 로그인 한 Id 를 가져옵니다.
+    string id;
+    if (not session->GetFromContext("id", &id)) {
+      LOG(WARNING) << "Failed to request matchmaking. Not logged in.";
+      session->SendMessage("error", MakeResponse("fail", "not logged in"));
+      return;
+    }
+
+    session->AddToContext("matching", "cancel");
+
+    // Matchmaking cancel 결과를 처리할 람다 함수입니다.
+    auto cancel_cb = [session](const string &player_id,
+                               MatchmakingClient::CancelResult result) {
+      Json response;
+
+      if (result == MatchmakingClient::kCRSuccess) {
+        LOG(INFO) << "Succeed to cancel matchmaking: id=" << player_id;
+        response = MakeResponse("Cancel");
+      } else if (result == MatchmakingClient::kCRNoRequest) {
+        response = MakeResponse("NoRequest");
+      } else {
+        response = MakeResponse("Error");
+      }
+
+      session->SendMessage("match", response, kDefaultEncryption, kTcp);
+    };
+
+    // Matchmaking 취소를 요청합니다.
+    MatchmakingClient::CancelMatchmaking(kMatch1vs1, id, cancel_cb);
 	}
 
 	// 매치 메이킹 요청을 수행합니다.
-       void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
-	       Rpc::PeerMap matchmakerServer;
-	       Rpc::GetPeersWithTag(&matchmakerServer, "matchmaker");
+  void OnMatchmakingRequested(const Ptr<Session> &session, const Json &message) {
+    static const WallClock::Duration kTimeout = WallClock::FromSec(10);
 
-	       if(matchmakerServer.size() == 0) {
-		       string msg =  "Fail to matchmaking. the matchmaker server is not running.";
-		       LOG(INFO) << msg;
+    // 로그인 한 Id 를 가져옵니다.
+    string id;
+    if (not session->GetFromContext("id", &id)) {
+      LOG(WARNING) << "Failed to request matchmaking. Not logged in.";
+      session->SendMessage("error", MakeResponse("fail", "not logged in"));
+      return;
+    }
 
-		       Json res;
-		       res["result"] = "fail";
-		       res["msg"] = msg;
-		       session->SendMessage("error", res);
-		       return;
-	       }
+    // Matchmaking 결과를 처리할 람다 함수입니다.
+    auto match_cb = [session](const string &player_id,
+                              const MatchmakingClient::Match &match,
+                              MatchmakingClient::MatchResult result) {
+      Json response;
 
-		Rpc::PeerMap gameServer;
-		Rpc::GetPeersWithTag(&gameServer, "game");
+      if (result == MatchmakingClient::kMRSuccess) {
+        // Matchmaking 에 성공했습니다.
+        LOG(INFO) << "Succeed in matchmaking: id=" << player_id;
 
-		if(gameServer.size() == 0) {
-			string msg =  "Fail to start game. the game server is not running.";
-			LOG(INFO) << msg;
+        BOOST_ASSERT(HasJsonStringAttribute(match.context, "A"));
+        BOOST_ASSERT(HasJsonStringAttribute(match.context, "B"));
 
-			Json res;
-			res["result"] = "fail";
-			res["msg"] = msg;
-			session->SendMessage("error", res);
-			return;
-		}
+        const string player_a_id = match.context["A"].GetString();
+        const string player_b_id = match.context["B"].GetString();
 
-	       pong_rpc::MatchmakingRpc(session);
+        string opponent_id = match.context["A"].GetString();
+        if (opponent_id == player_id) {
+          opponent_id = match.context["B"].GetString();
         }
+
+        response = MakeResponse("Success");
+        response["A"] = player_a_id;
+        response["B"] = player_b_id;
+
+        if (player_id == player_a_id) {
+          session->AddToContext("opponent", player_b_id);
+        } else {
+          session->AddToContext("opponent", player_a_id);
+        }
+        session->AddToContext("matching", "done");
+        session->AddToContext("ready", 0);
+
+        // 유저를 Game 서버로 보냅니다.
+        pong_redirection::MoveServerByTag(session, "game");
+      } else if (result == MatchmakingClient::kMRAlreadyRequested) {
+        // Matchmaking 요청을 중복으로 보냈습니다.
+        LOG(INFO) << "Failed in matchmaking. Already requested: id="
+                  << player_id;
+			  session->AddToContext("matching", "failed");
+        response = MakeResponse("AlreadyRequested");
+      } else if (result == MatchmakingClient::kMRTimeout) {
+        // Matchmaking 처리가 시간 초과되었습니다.
+        LOG(INFO) << "Failed in matchmaking. Timeout: id=" << player_id;
+			  session->AddToContext("matching", "failed");
+        response = MakeResponse("Timeout");
+      } else {
+        // Matchmaking 에 오류가 발생했습니다.
+        LOG(ERROR) << "Failed in matchmaking. Erorr: id=" << player_id;
+			  session->AddToContext("matching", "failed");
+        response = MakeResponse("Error");
+      }
+
+      session->SendMessage("match", response, kDefaultEncryption, kTcp);
+    };
+
+    Json empty_player_ctxt;
+    empty_player_ctxt.SetObject();
+
+    // Matchmaking 을 요청합니다.
+    MatchmakingClient::StartMatchmaking(
+        kMatch1vs1, id, empty_player_ctxt, match_cb,
+        // 아래 인자는 experimental 버전이 필요합니다.(2017.04.06 기준)
+        // MatchmakingClient::kMostNumberOfPlayers,
+        MatchmakingClient::kNullProgressCallback, kTimeout);
+  }
 
 	// 매칭 성공 후, 게임을 플레이할 준비가 되면 클라이언트는 ready를 보냅니다.
 	void OnReadySignal(const Ptr<Session> &session, const Json &message) {
@@ -330,10 +429,6 @@ namespace pong {
 
 		{
 			pong_redirection::RegisterRedirectionHandlers();
-		}
-
-		{
-			pong_rpc::RegisterRpcHandlers();
 		}
 	}
 }  // namespace pong

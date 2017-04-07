@@ -186,10 +186,6 @@
             "redis_tag_for_cross_server_storage": ""
           },
           "MatchmakingClient": {
-          },
-          "MatchmakingServer": {
-            "enable_dynamic_match": true,
-            "enable_match_progress_callback": false
           }
       },
       "library": "libpong.so"
