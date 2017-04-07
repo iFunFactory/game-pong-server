@@ -29,6 +29,9 @@ namespace pong_lb {
 		}
 
 		// 현재 연승 수를 반환합니다.
+    if (response.records.empty()) {
+      return 0;
+    }
 		return response.records[0].score;
 	}
 
