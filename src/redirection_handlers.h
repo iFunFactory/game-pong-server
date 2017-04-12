@@ -1,4 +1,4 @@
-﻿#ifndef SRC_PONG_UTILS_H_
+#ifndef SRC_PONG_UTILS_H_
 #define SRC_PONG_UTILS_H_
 
 #include <funapi.h>
@@ -10,8 +10,9 @@
 
 namespace pong_redirection {
 
-void MoveServerByTag(const Ptr<Session> session, const string &tag);
-void RegisterRedirectionHandlers();
+        void MoveServerByTag(const Ptr<Session> session, const string &tag);
+
+	void RegisterRedirectionHandlers();
 
 }  // namespace pong_util
 
