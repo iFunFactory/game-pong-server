@@ -4,185 +4,200 @@
 #include <glog/logging.h>
 
 #include "common_handlers.h"
-#include "leaderboard_handlers.h"
+#include "leaderboard.h"
 #include "matchmaking.h"
 #include "pong_loggers.h"
 #include "pong_types.h"
 
 DECLARE_string(app_flavor);
 
+
 namespace pong {
 
+// Player 들의 승/패를 1 증가 시킵니다.
+void FetchAndUpdateMatchRecord(const string& winner_id,
+                               const string& loser_id) {
+  Ptr<User> winner = User::FetchById(winner_id);
+  Ptr<User> loser = User::FetchById(loser_id);
+
+  if(not winner) {
+    LOG(ERROR) << "Cannot find winner's id in db: id=" << winner_id;
+    return;
+  }
+
+  if(not loser) {
+    LOG(ERROR) << "Cannot find loser's id in db: id=" << loser_id;
+    return;
+  }
+
+  winner->SetWinCount(winner->GetWinCount() + 1);
+  loser->SetLoseCount(loser->GetLoseCount() + 1);
+}
+
+
+// game/lobby_handlers.cc 에 서로 동일한 함수명을 갖는 것들은
+// unnamed namespace 로 감쌉니다.
 namespace {
 
-	void UpdateMatchRecord(const string& winnerId, const string& loserId)
-	{
-		Ptr<User> winner = User::FetchById(winnerId);
-		Ptr<User> loser = User::FetchById(loserId);
+void FreeUser(const Ptr<Session> &session);
 
-		if(not winner) {
-			LOG(ERROR) << "[" << FLAGS_app_flavor << "] Cannot find winner's id in db" << winnerId;
-			return;
-		}
-
-		if(not loser) {
-			LOG(ERROR) << "[" << FLAGS_app_flavor << "] Cannot find loser's id in db" << loserId;
-			return;
-		}
-
-		winner->SetWinCount(winner->GetWinCount() + 1);
-		loser->SetLoseCount(loser->GetLoseCount() + 1);
-	}
+// 새 클라이언트가 접속하여 세션이 열릴 때 불리는 함수
+void OnSessionOpened(const Ptr<Session> &session) {
+  // 세션 접속  Activity Log 를 남깁니다.
+  logger::SessionOpened(to_string(session->id()), WallClock::Now());
+}
 
 
+// 세션이 닫혔을 때 불리는 함수
+void OnSessionClosed(const Ptr<Session> &session, SessionCloseReason reason) {
+  // 세션 닫힘 Activity Log 를 남깁니다.
+  logger::SessionClosed(to_string(session->id()), WallClock::Now());
+  // 세션을 초기과 합니다.
+  FreeUser(session);
+}
+
+
+// TCP 연결이 끊기면 불립니다.
+void OnTransportTcpDetached(const Ptr<Session> &session) {
+  string id;
+  session->GetFromContext("id", &id);
+  LOG_IF(INFO, not id.empty()) << "TCP disconnected: id=" << id;
+  // 세션을 초기과 합니다.
+  FreeUser(session);
+}
+
+
+// 세션을 정리합니다.
 void FreeUser(const Ptr<Session> &session) {
   // 유저를 정리하기 위한 Context 를 읽어옵니다.
-  string opponentId;
-  string myId;
-  session->GetFromContext("opponent", &opponentId);
-  session->GetFromContext("id", &myId);
+  string opponent_id;
+  string my_id;
+  session->GetFromContext("opponent", &opponent_id);
+  session->GetFromContext("id", &my_id);
 
   // Session Context 를 초기화 합니다.
   session->SetContext(Json());
 
   // 로그아웃하고 세션을 종료합니다.
-  if (not myId.empty()) {
+  if (not my_id.empty()) {
     auto logout_cb = [](const string &id, const Ptr<Session> &session,
                         bool success) {
       if (success) {
         LOG(INFO) << "Logged out(local) by session close: id=" << id;
       }
     };
-    AccountManager::SetLoggedOutAsync(myId, logout_cb);
+    AccountManager::SetLoggedOutAsync(my_id, logout_cb);
   }
 
-  // 대전 상대가 있는 경우, 상대에게 승리 메세지를 보냅니다.
-  if (opponentId.empty()) {
+  // 대전 상대가 있는 경우, 상대가 승리한 것으로 처리하고 로비서버로 보냅니다.
+  if (opponent_id.empty()) {
     return;
   }
-  Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-  if (not opponentSession || not opponentSession->IsTransportAttached()) {
+  Ptr<Session> opponent_session = AccountManager::FindLocalSession(opponent_id);
+  if (not opponent_session || not opponent_session->IsTransportAttached()) {
     return;
   }
 
-  Event::Invoke(bind(&UpdateMatchRecord, opponentId, myId));
-  pong_lb::IncreaseCurWincount(opponentId);
-  pong_lb::ResetCurWincount(myId);
-  MoveServerByTag(opponentSession, "lobby");
+  Event::Invoke(bind(&FetchAndUpdateMatchRecord, opponent_id, my_id));
 
-  Json message;
-  message["result"] = "win";
-  opponentSession->SendMessage("result", message, kDefaultEncryption, kTcp);
+  IncreaseCurWinCount(opponent_id);
+  ResetCurWinCount(my_id);
 
-  opponentSession->DeleteFromContext("opponent");
-  FreeUser(opponentSession);
+  opponent_session->SendMessage("result", MakeResponse("win"),
+                                kDefaultEncryption, kTcp);
+
+  MoveServerByTag(opponent_session, "lobby");
+
+  opponent_session->DeleteFromContext("opponent");
+  FreeUser(opponent_session);
 }
 
-	// session opened
-	void OnSessionOpened(const Ptr<Session> &session) {
-		logger::SessionOpened(to_string(session->id()), WallClock::Now());
-	}
-
-	// session closed
-	void OnSessionClosed(const Ptr<Session> &session, SessionCloseReason reason) {
-		logger::SessionClosed(to_string(session->id()), WallClock::Now());
-    FreeUser(session);
-	}
-
-	// transport detached
-	void OnTransportTcpDetached(const Ptr<Session> &session) {
-    LOG(INFO) << "TCP disconnected: id="
-              << AccountManager::FindLocalAccount(session);
-    FreeUser(session);
-	}
 }  // unnamed namesapce
 
-	// 메세지 핸들러
 
-	// 매칭 성공 후, 게임을 플레이할 준비가 되면 클라이언트는 ready를 보냅니다.
-	void OnReadySignal(const Ptr<Session> &session, const Json &message) {
-		session->AddToContext("ready", 1);
-		string opponentId;
-		session->GetFromContext("opponent", &opponentId);
-		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-		// 상대의 상태를 확인합니다.
-		if (opponentSession && opponentSession->IsTransportAttached()) {
-			int64_t is_opponent_ready = 0;
-			opponentSession->GetFromContext("ready", &is_opponent_ready);
-			if (is_opponent_ready == 1) {
-				// 둘 다 준비가 되었습니다. 시작 신호를 보냅니다.
-				Json response;
-				response["result"] = "ok";
-				session->SendMessage("start", response);
-				opponentSession->SendMessage("start", response);
-			}
-		}
-		else {
-			// 상대가 접속을 종료했습니다.
-			Json response;
-			response["result"] = "opponent disconnected";
-			session->SendMessage("match", response, kDefaultEncryption, kTcp);
-			return;
-		}
-	}
+// 게임 플레이 준비 메시지를 받으면 불립니다.
+void OnReadySignal(const Ptr<Session> &session, const Json &message) {
+  session->AddToContext("ready", 1);
+  string opponent_id;
+  session->GetFromContext("opponent", &opponent_id);
+  Ptr<Session> opponent_session = AccountManager::FindLocalSession(opponent_id);
+  // 상대의 상태를 확인합니다.
+  if (opponent_session && opponent_session->IsTransportAttached()) {
+    int64_t is_opponent_ready = 0;
+    opponent_session->GetFromContext("ready", &is_opponent_ready);
+    if (is_opponent_ready == 1) {
+      // 둘 다 준비가 되었습니다. 시작 신호를 보냅니다.
+      Json response = MakeResponse("ok");
+      session->SendMessage("start", response);
+      opponent_session->SendMessage("start", response);
+    }
+  } else {
+    // 상대가 접속을 종료했습니다.
+    session->SendMessage("match", MakeResponse("opponent disconnected"),
+                         kDefaultEncryption, kTcp);
+    return;
+  }
+}
 
-	// 메세지 릴레이를 수행합니다. tcp, udp 둘 다 이 함수로 처리합니다.
-	void OnRelayRequested(const Ptr<Session> &session, const Json &message) {
-		string opponentId;
-		session->GetFromContext("opponent", &opponentId);
-		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-		if (opponentSession && opponentSession->IsTransportAttached()) {
 
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] relay. Session : " << session;
-			opponentSession->SendMessage("relay", message);
-		}
-	}
+// 릴레이 메시지를 받으면 불립니다. TCP, UDP 둘 다 이 함수로 처리합니다.
+void OnRelayRequested(const Ptr<Session> &session, const Json &message) {
+  string opponent_id;
+  session->GetFromContext("opponent", &opponent_id);
+  Ptr<Session> opponent_session = AccountManager::FindLocalSession(opponent_id);
+  if (opponent_session && opponent_session->IsTransportAttached()) {
+    LOG(INFO) << "message relay: session_id=" << session->id();
+    opponent_session->SendMessage("relay", message);
+  }
+}
 
-	void OnResultRequested(const Ptr<Session> &session, const Json &message) {
-		// 패배한 쪽만 result를 보내도록 되어있습니다.
-		string myId;
-		session->GetFromContext("id", &myId);
 
-		string opponentId;
-		session->GetFromContext("opponent", &opponentId);
-		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
+// 결과 요청 메시지를 받으면 불립니다.
+void OnResultRequested(const Ptr<Session> &session, const Json &message) {
+  // 패배한 쪽만 result를 보내도록 되어있습니다.
 
-		UpdateMatchRecord(opponentId, myId);
+  // 내 아이디를 가져옵니다.
+  string my_id;
+  session->GetFromContext("id", &my_id);
 
-		if (opponentSession && opponentSession->IsTransportAttached()) {
-			// 상대에게 승리했음을 알립니다.
-			Json winMessage;
-			winMessage["result"] = "win";
-			opponentSession->SendMessage("result", winMessage);
-			pong_lb::IncreaseCurWincount(opponentId);
-		}
-		// 패배 확인 메세지를 보냅니다.
-		session->SendMessage("result", message);
-		pong_lb::ResetCurWincount(myId);
+  // 상대방의 아이디와 세션을 가져옵니다.
+  string opponent_id;
+  session->GetFromContext("opponent", &opponent_id);
+  Ptr<Session> opponent_session = AccountManager::FindLocalSession(opponent_id);
 
-		// 각각 상대방에 대한 정보를 삭제합니다.
-		opponentSession->DeleteFromContext("opponent");
-		session->DeleteFromContext("opponent");
+  FetchAndUpdateMatchRecord(opponent_id, my_id);
 
-		// 두 플레이어를 lobby서버로 이동시킵니다.
-		MoveServerByTag(opponentSession, "lobby");
-		MoveServerByTag(session, "lobby");
+  if (opponent_session && opponent_session->IsTransportAttached()) {
+    // 상대에게 승리했음을 알립니다.
+    opponent_session->SendMessage("result", MakeResponse("win"));
+    IncreaseCurWinCount(opponent_id);
+  }
 
-    FreeUser(opponentSession);
-    FreeUser(session);
-	}
+  // 패배 확인 메세지를 보냅니다.
+  session->SendMessage("result", message);
+  ResetCurWinCount(my_id);
 
-	// regist handlers
-	void RegisterGameEventHandlers() {
-		{
-			HandlerRegistry::Install2(OnSessionOpened, OnSessionClosed);
-			HandlerRegistry::RegisterTcpTransportDetachedHandler(OnTransportTcpDetached);
-		}
+  // 각각 상대방에 대한 정보를 삭제합니다.
+  opponent_session->DeleteFromContext("opponent");
+  session->DeleteFromContext("opponent");
 
-		{
-			HandlerRegistry::Register("ready", OnReadySignal);
-			HandlerRegistry::Register("relay", OnRelayRequested);
-			HandlerRegistry::Register("result", OnResultRequested);
-		}
-	}
+  // 두 플레이어를 lobby서버로 이동시킵니다.
+  MoveServerByTag(opponent_session, "lobby");
+  MoveServerByTag(session, "lobby");
+
+  FreeUser(opponent_session);
+  FreeUser(session);
+}
+
+
+// 게임 서버 핸들러들을 등록합니다.
+void RegisterGameEventHandlers() {
+  HandlerRegistry::Install2(OnSessionOpened, OnSessionClosed);
+  HandlerRegistry::RegisterTcpTransportDetachedHandler(OnTransportTcpDetached);
+
+  HandlerRegistry::Register("ready", OnReadySignal);
+  HandlerRegistry::Register("relay", OnRelayRequested);
+  HandlerRegistry::Register("result", OnResultRequested);
+}
+
 }  // namespace pong

@@ -14,8 +14,8 @@ set(
   game_event_handlers.h
   lobby_event_handlers.cc
   lobby_event_handlers.h
-  leaderboard_handlers.cc
-  leaderboard_handlers.h
+  leaderboard.cc
+  leaderboard.h
   matchmaking.h
   matchmaking.cc
   ${PROJECT_NAME}_server.cc
