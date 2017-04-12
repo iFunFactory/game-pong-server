@@ -42,6 +42,19 @@ inline Json MakeResponse(const string &result) {
   return response;
 }
 
+
+inline Rpc::PeerId PickServerRandomly(const Rpc::Tag &tag) {
+  Rpc::PeerMap servers;
+  Rpc::GetPeersWithTag(&servers, tag);
+  if (servers.empty()) {
+    return Rpc::kNullPeerId;
+  }
+  int64_t rnd = RandomGenerator::GenerateNumber(0, servers.size() - 1);
+  Rpc::PeerMap::const_iterator itr = servers.begin();
+  for (int64_t i = 0; i < rnd; ++i) { ++itr; }
+  return itr->first;
+}
+
 }  // namespace pong
 
 #endif  // SRC_PONG_TYPES_H_

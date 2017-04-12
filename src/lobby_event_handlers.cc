@@ -3,11 +3,11 @@
 #include <funapi.h>
 #include <glog/logging.h>
 
+#include "common_handlers.h"
 #include "leaderboard_handlers.h"
 #include "matchmaking.h"
 #include "pong_loggers.h"
 #include "pong_types.h"
-#include "redirection_handlers.h"
 
 DECLARE_string(app_flavor);
 
@@ -73,12 +73,6 @@ void FreeUser(const Ptr<Session> &session) {
               << AccountManager::FindLocalAccount(session);
     FreeUser(session);
 	}
-
-  void OnLoggedOutRemotely(const string &id, const Ptr<Session> &session) {
-    // 다른 서버에서 로그아웃시켰습니다.
-    LOG(INFO) << "Close session. by logged out remotely: id=" << id;
-    session->Close();
-  }
 }  // unnamed namespace
 
 
@@ -283,7 +277,7 @@ void FreeUser(const Ptr<Session> &session) {
         session->AddToContext("ready", 0);
 
         // 유저를 Game 서버로 보냅니다.
-        pong_redirection::MoveServerByTag(session, "game");
+        MoveServerByTag(session, "game");
         FreeUser(session);
       } else if (result == MatchmakingClient::kMRAlreadyRequested) {
         // Matchmaking 요청을 중복으로 보냈습니다.
@@ -334,14 +328,6 @@ void FreeUser(const Ptr<Session> &session) {
 			HandlerRegistry::Register("match", OnMatchmakingRequested);
 			HandlerRegistry::Register("cancelmatch", OnCancelRequested);
 			HandlerRegistry::Register("ranklist", OnRanklistRequested);
-		}
-
-    {
-      AccountManager::RegisterRemoteLogoutHandler(OnLoggedOutRemotely);
-    }
-
-		{
-			pong_redirection::RegisterRedirectionHandlers();
 		}
 	}
 }  // namespace pong

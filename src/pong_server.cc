@@ -2,6 +2,7 @@
 #include <funapi.h>
 #include <gflags/gflags.h>
 
+#include "common_handlers.h"
 #include "game_event_handlers.h"
 #include "lobby_event_handlers.h"
 #include "matchmaking.h"
@@ -24,10 +25,12 @@ class PongServer : public Component {
     if (FLAGS_app_flavor == "lobby") {
       // Lobby 서버 역할로 초기화 합니다.
       LOG(INFO) << "Install lobby server";
+			pong::RegisterCommonHandlers();
       pong::RegisterLobbyEventHandlers();
     } else if (FLAGS_app_flavor == "game") {
       // Game 서버 역할로 초기화 합니다.
       LOG(INFO) << "Install game server";
+			pong::RegisterCommonHandlers();
       pong::RegisterGameEventHandlers();
     } else if (FLAGS_app_flavor == "matchmaker") {
       // Matchmaker 서버 역할로 초기화 합니다.

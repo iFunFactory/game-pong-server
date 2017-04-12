@@ -8,6 +8,8 @@
 # NOTE: IF YOU HAVE MORE SOURCE FILES, ADD HERE.
 set(
   ADDITIONAL_CPP_SOURCES
+  common_handlers.cc
+  common_handlers.h
   game_event_handlers.cc
   game_event_handlers.h
   lobby_event_handlers.cc
@@ -16,8 +18,6 @@ set(
   leaderboard_handlers.h
   matchmaking.h
   matchmaking.cc
-  redirection_handlers.cc
-  redirection_handlers.h
   ${PROJECT_NAME}_server.cc
 )
 
