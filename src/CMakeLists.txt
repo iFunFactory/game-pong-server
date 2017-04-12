@@ -8,8 +8,10 @@
 # NOTE: IF YOU HAVE MORE SOURCE FILES, ADD HERE.
 set(
   ADDITIONAL_CPP_SOURCES
-  event_handlers.cc
-  event_handlers.h
+  game_event_handlers.cc
+  game_event_handlers.h
+  lobby_event_handlers.cc
+  lobby_event_handlers.h
   leaderboard_handlers.cc
   leaderboard_handlers.h
   matchmaking.h

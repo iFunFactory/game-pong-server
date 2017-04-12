@@ -1,84 +1,45 @@
-#include "event_handlers.h"
-#include "leaderboard_handlers.h"
-#include "redirection_handlers.h"
+#include "lobby_event_handlers.h"
 
 #include <funapi.h>
 #include <glog/logging.h>
 
+#include "leaderboard_handlers.h"
 #include "matchmaking.h"
 #include "pong_loggers.h"
-#include "pong_messages.pb.h"
 #include "pong_types.h"
+#include "redirection_handlers.h"
 
 DECLARE_string(app_flavor);
 
 namespace pong {
 
-Json MakeResponse(const string &result, const string &message) {
-  Json response;
-  response["result"] = result;
-  response["message"] = message;
-  return response;
-}
-
-
-Json MakeResponse(const string &result) {
-  Json response;
-  response["result"] = result;
-  return response;
-}
-
-	void UpdateMatchRecord(const string& winnerId, const string& loserId)
-	{
-		Ptr<User> winner = User::FetchById(winnerId);
-		Ptr<User> loser = User::FetchById(loserId);
-
-		if(not winner) {
-			LOG(ERROR) << "[" << FLAGS_app_flavor << "] Cannot find winner's id in db" << winnerId;
-			return;
-		}
-
-		if(not loser) {
-			LOG(ERROR) << "[" << FLAGS_app_flavor << "] Cannot find loser's id in db" << loserId;
-			return;
-		}
-
-		winner->SetWinCount(winner->GetWinCount() + 1);
-		loser->SetLoseCount(loser->GetLoseCount() + 1);
-	}
-
+namespace {
 
 void FreeUser(const Ptr<Session> &session) {
-  // 대전 상대가 있는지 확인합니다.
-  string opponentId;
-  session->GetFromContext("opponent", &opponentId);
-  if (!opponentId.empty())
-  {
-    // 대전 상대가 있는 경우, 상대에게 승리 메세지를 보냅니다.
-    Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-    if (opponentSession && opponentSession->IsTransportAttached())
-    {
-      string myId;
-      session->GetFromContext("id", &myId);
-      Event::Invoke(bind(&UpdateMatchRecord, opponentId, myId));
-      pong_lb::IncreaseCurWincount(opponentId);
-      pong_lb::ResetCurWincount(myId);
-      pong_redirection::MoveServerByTag(opponentSession, "lobby");
+  // 유저를 정리하기 위한 Context 를 읽어옵니다.
+  string matchingContext;
+  string id;
+  session->GetFromContext("matching", &matchingContext);
+  session->GetFromContext("id", &id);
 
-      Json message;
-      message["result"] = "win";
-      opponentSession->SendMessage("result", message, kDefaultEncryption, kTcp);
-    }
+  // Session Context 를 초기화 합니다.
+  session->SetContext(Json());
+
+  // 로그아웃하고 세션을 종료합니다.
+  if (not id.empty()) {
+    auto logout_cb = [](const string &id, const Ptr<Session> &session,
+                        bool success) {
+      if (success) {
+        LOG(INFO) << "Logged out(local) by session close: id=" << id;
+      }
+    };
+    AccountManager::SetLoggedOutAsync(id, logout_cb);
   }
 
   // 매치메이킹이 진행중인지 확인합니다.
-  string matchingContext;
-  session->GetFromContext("matching", &matchingContext);
   if (!matchingContext.empty() && matchingContext == "doing")
   {
     // 매치메이킹이 진행 중인 경우, 취소합니다.
-    string id;
-    session->GetFromContext("id", &id);
     // Matchmaking cancel 결과를 처리할 람다 함수입니다.
     auto cancel_cb = [](const string &player_id,
                         MatchmakingClient::CancelResult result) {
@@ -93,21 +54,6 @@ void FreeUser(const Ptr<Session> &session) {
 
     MatchmakingClient::CancelMatchmaking(kMatch1vs1, id, cancel_cb);
   }
-
-  // 로그아웃하고 세션을 종료합니다.
-  string id = AccountManager::FindLocalAccount(session);
-  if (not id.empty()) {
-    auto logout_cb = [](const string &id, const Ptr<Session> &session,
-                        bool success) {
-      if (success) {
-        LOG(INFO) << "Logged out(local) by session close: id=" << id;
-      }
-    };
-    AccountManager::SetLoggedOutAsync(id, logout_cb);
-  }
-
-  // Session Context 를 초기화 합니다.
-  session->SetContext(Json());
 }
 
 	// session opened
@@ -120,6 +66,21 @@ void FreeUser(const Ptr<Session> &session) {
 		logger::SessionClosed(to_string(session->id()), WallClock::Now());
     FreeUser(session);
 	}
+
+	// transport detached
+	void OnTransportTcpDetached(const Ptr<Session> &session) {
+    LOG(INFO) << "TCP disconnected: id="
+              << AccountManager::FindLocalAccount(session);
+    FreeUser(session);
+	}
+
+  void OnLoggedOutRemotely(const string &id, const Ptr<Session> &session) {
+    // 다른 서버에서 로그아웃시켰습니다.
+    LOG(INFO) << "Close session. by logged out remotely: id=" << id;
+    session->Close();
+  }
+}  // unnamed namespace
+
 
 	void AsyncLoginCallback(const string &id, const Ptr<Session> &session,
                           bool success) {
@@ -223,13 +184,6 @@ void FreeUser(const Ptr<Session> &session) {
                                              AsyncLoginCallback);
 	}
 
-	// transport detached
-	void OnTransportTcpDetached(const Ptr<Session> &session) {
-    LOG(INFO) << "TCP disconnected: id="
-              << AccountManager::FindLocalAccount(session);
-    FreeUser(session);
-	}
-
 	// 메세지 핸들러
 
 	// 로그인 요청
@@ -330,6 +284,7 @@ void FreeUser(const Ptr<Session> &session) {
 
         // 유저를 Game 서버로 보냅니다.
         pong_redirection::MoveServerByTag(session, "game");
+        FreeUser(session);
       } else if (result == MatchmakingClient::kMRAlreadyRequested) {
         // Matchmaking 요청을 중복으로 보냈습니다.
         LOG(INFO) << "Failed in matchmaking. Already requested: id="
@@ -362,89 +317,12 @@ void FreeUser(const Ptr<Session> &session) {
         MatchmakingClient::kNullProgressCallback, kTimeout);
   }
 
-	// 매칭 성공 후, 게임을 플레이할 준비가 되면 클라이언트는 ready를 보냅니다.
-	void OnReadySignal(const Ptr<Session> &session, const Json &message) {
-		session->AddToContext("ready", 1);
-		string opponentId;
-		session->GetFromContext("opponent", &opponentId);
-		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-		// 상대의 상태를 확인합니다.
-		if (opponentSession && opponentSession->IsTransportAttached()) {
-			int64_t is_opponent_ready = 0;
-			opponentSession->GetFromContext("ready", &is_opponent_ready);
-			if (is_opponent_ready == 1) {
-				// 둘 다 준비가 되었습니다. 시작 신호를 보냅니다.
-				Json response;
-				response["result"] = "ok";
-				session->SendMessage("start", response);
-				opponentSession->SendMessage("start", response);
-			}
-		}
-		else {
-			// 상대가 접속을 종료했습니다.
-			Json response;
-			response["result"] = "opponent disconnected";
-			session->SendMessage("match", response, kDefaultEncryption, kTcp);
-			return;
-		}
-	}
-
-	// 메세지 릴레이를 수행합니다. tcp, udp 둘 다 이 함수로 처리합니다.
-	void OnRelayRequested(const Ptr<Session> &session, const Json &message) {
-		string opponentId;
-		session->GetFromContext("opponent", &opponentId);
-		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-		if (opponentSession && opponentSession->IsTransportAttached()) {
-
-			LOG(INFO) << "[" << FLAGS_app_flavor << "] relay. Session : " << session;
-			opponentSession->SendMessage("relay", message);
-		}
-	}
-
-	void OnResultRequested(const Ptr<Session> &session, const Json &message) {
-		// 패배한 쪽만 result를 보내도록 되어있습니다.
-		string myId;
-		session->GetFromContext("id", &myId);
-
-		string opponentId;
-		session->GetFromContext("opponent", &opponentId);
-		Ptr<Session> opponentSession = AccountManager::FindLocalSession(opponentId);
-
-		UpdateMatchRecord(opponentId, myId);
-
-		if (opponentSession && opponentSession->IsTransportAttached()) {
-			// 상대에게 승리했음을 알립니다.
-			Json winMessage;
-			winMessage["result"] = "win";
-			opponentSession->SendMessage("result", winMessage);
-			pong_lb::IncreaseCurWincount(opponentId);
-		}
-		// 패배 확인 메세지를 보냅니다.
-		session->SendMessage("result", message);
-		pong_lb::ResetCurWincount(myId);
-
-		// 각각 상대방에 대한 정보를 삭제합니다.
-		opponentSession->DeleteFromContext("opponent");
-		session->DeleteFromContext("opponent");
-
-		// 두 플레이어를 lobby서버로 이동시킵니다.
-		pong_redirection::MoveServerByTag(opponentSession, "lobby");
-		pong_redirection::MoveServerByTag(session, "lobby");
-	}
-
 	void OnRanklistRequested(const Ptr<Session> &session, const Json &message) {
 		pong_lb::GetTopEightList(session);
 	}
 
-
-  void OnLoggedOutRemotely(const string &id, const Ptr<Session> &session) {
-    // 다른 서버에서 로그아웃시켰습니다.
-    LOG(INFO) << "Close session. by logged out remotely: id=" << id;
-    session->Close();
-  }
-
 	// regist handlers
-	void RegisterEventHandlers() {
+	void RegisterLobbyEventHandlers() {
 		{
 			HandlerRegistry::Install2(OnSessionOpened, OnSessionClosed);
 			HandlerRegistry::RegisterTcpTransportDetachedHandler(OnTransportTcpDetached);
@@ -454,9 +332,6 @@ void FreeUser(const Ptr<Session> &session) {
 			JsonSchema login_msg(JsonSchema::kObject, JsonSchema("id", JsonSchema::kString, true));
 			HandlerRegistry::Register("login", OnAccountLogin, login_msg);
 			HandlerRegistry::Register("match", OnMatchmakingRequested);
-			HandlerRegistry::Register("ready", OnReadySignal);
-			HandlerRegistry::Register("relay", OnRelayRequested);
-			HandlerRegistry::Register("result", OnResultRequested);
 			HandlerRegistry::Register("cancelmatch", OnCancelRequested);
 			HandlerRegistry::Register("ranklist", OnRanklistRequested);
 		}

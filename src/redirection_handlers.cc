@@ -2,7 +2,6 @@
 
 #include <funapi.h>
 
-#include "event_handlers.h"
 #include "pong_loggers.h"
 #include "pong_messages.pb.h"
 
@@ -23,7 +22,6 @@ namespace pong_redirection {
 			return;
 		}
 
-    bool success = false;
 		for (Rpc::PeerMap::const_iterator itr = servers.begin(); itr != servers.end(); ++itr) {
 			const Rpc::PeerId &target = itr->first;
 
@@ -37,15 +35,10 @@ namespace pong_redirection {
 				LOG(INFO) << "[" << FLAGS_app_flavor << "] Client redirecting is failed!" << id;
 				// 해당 서버가 없거나, 로그인되지 않았거나 한 경우, 실패하며, 여기서 처리
 			} else {
-        success = true;
 				LOG(INFO) << "[" << FLAGS_app_flavor << "] Redirecting message sent to " << id << " msg: move to " << tag << " server";
 			}
 			break;
 		}
-
-    if (success) {
-      pong::FreeUser(session);
-    }
 	}
 
 

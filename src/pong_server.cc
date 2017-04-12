@@ -2,8 +2,11 @@
 #include <funapi.h>
 #include <gflags/gflags.h>
 
-#include "event_handlers.h"
+#include "game_event_handlers.h"
+#include "lobby_event_handlers.h"
 #include "matchmaking.h"
+#include "pong_object.h"
+
 
 DECLARE_string(app_flavor);
 
@@ -16,23 +19,29 @@ class PongServer : public Component {
   static bool Install(const ArgumentMap &arguments) {
     LOG(INFO) << "Built using Engine version: " << FUNAPI_BUILD_IDENTIFIER;
 
+    pong::ObjectModelInit();
+
     if (FLAGS_app_flavor == "lobby") {
+      // Lobby 서버 역할로 초기화 합니다.
       LOG(INFO) << "Install lobby server";
+      pong::RegisterLobbyEventHandlers();
+    } else if (FLAGS_app_flavor == "game") {
+      // Game 서버 역할로 초기화 합니다.
+      LOG(INFO) << "Install game server";
+      pong::RegisterGameEventHandlers();
     } else if (FLAGS_app_flavor == "matchmaker") {
+      // Matchmaker 서버 역할로 초기화 합니다.
       LOG(INFO) << "Install matchmaker  server";
       pong::StartMatchmakingServer();
     } else {
-      BOOST_ASSERT(FLAGS_app_flavor == "game");
-      LOG(INFO) << "Install game server";
+      BOOST_ASSERT(false);
     }
 
-    // 초기화 부분입니다.
-    pong::ObjectModelInit();
-    pong::RegisterEventHandlers();
     return true;
   }
 
   static bool Start() {
+    LOG(INFO) << "Starting " << FLAGS_app_flavor << " server";
     return true;
   }
 

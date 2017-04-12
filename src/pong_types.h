@@ -27,6 +27,21 @@ inline bool HasJsonStringAttribute(const Json &json,
   return true;
 }
 
+
+inline Json MakeResponse(const string &result, const string &message) {
+  Json response;
+  response["result"] = result;
+  response["message"] = message;
+  return response;
+}
+
+
+inline Json MakeResponse(const string &result) {
+  Json response;
+  response["result"] = result;
+  return response;
+}
+
 }  // namespace pong
 
 #endif  // SRC_PONG_TYPES_H_
