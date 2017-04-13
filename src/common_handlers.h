@@ -1,4 +1,4 @@
-#ifndef SRC_COMMON_HANDLERS_H_
+﻿#ifndef SRC_COMMON_HANDLERS_H_
 #define SRC_COMMON_HANDLERS_H_
 
 #include <funapi.h>
