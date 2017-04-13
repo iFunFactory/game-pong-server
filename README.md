@@ -103,10 +103,10 @@ $ sudo vim /usr/share/funapi-authenticator/default/manifests/MANIFEST.json
 ...
 ```
 
-다음으로, `src/MANIFEST.json` 의 컴포넌트 설정을 해주어야 합니다. 해당 프로젝트에서는 **서버 flavor 기능**을 사용하여 `'login'` 서버에서 인증(authentication)이 이루어집니다. 따라서 `MANIFEST.login.json` 파일을 수정해야 합니다.
+다음으로, `src/MANIFEST.json` 의 컴포넌트 설정을 해주어야 합니다. 해당 프로젝트에서는 **서버 flavor 기능**을 사용하여 `'lobby'` 서버에서 인증(authentication)이 이루어집니다. 따라서 `MANIFEST.lobby.json` 파일을 수정해야 합니다.
 
 ```bash
-$ sudo vim /game-pong-server/src/MANIFEST.login.json
+$ sudo vim /game-pong-server/src/MANIFEST.lobby.json
 ```
 
 위의 명령어를 입력하여 파일을 열고, 다음과 같이 use_authenticator를 true로 변경합니다. 그리고 해당 인증 에이전트인 funapi-authenticator의 ip주소와 port번호를 각각 입력해줍니다. 여기서, `remote_authenticator_port`는 **/usr/share/funapi-authenticator/manifests/src/MANIFEST.json파일**의 `tcp_listen_port`와 같은 값이여야 합니다.
@@ -280,11 +280,10 @@ Linking CXX shard module libpong.so
 [100%] Built target Pong
 ```
 
-iFunEngine은 빌드 후 `-local` 스크립트와 `-launcher` 스크립트를 생성합니다. `-local` 스크립트는 개발 중에 서버를 실행할 때 사용하며 `-launcher` 스크립트는 게임 서버를 패키징하여 데몬으로 실행할 때 사용합니다. 또한, 해당 프로젝트에서는 flavor 기능을 사용하여 login, lobby, matchmaker, game으로 나누어 서버를 관리하고 있습니다. 때문에 빌드가 완료되면 login, lobby, matchmaker, game서버마다 별도로 `-local`스크립트와 `-launcher`스크립트가 생성됩니다.
+iFunEngine은 빌드 후 `-local` 스크립트와 `-launcher` 스크립트를 생성합니다. `-local` 스크립트는 개발 중에 서버를 실행할 때 사용하며 `-launcher` 스크립트는 게임 서버를 패키징하여 데몬으로 실행할 때 사용합니다. 또한, 해당 프로젝트에서는 flavor 기능을 사용하여 lobby, matchmaker, game으로 나누어 서버를 관리하고 있습니다. 때문에 빌드가 완료되면 lobby, matchmaker, game서버마다 별도로 `-local`스크립트와 `-launcher`스크립트가 생성됩니다.
 
-* `login server` : authenticate를 담당하는 서버입니다.
-* `lobby server` : 로그인이 완료된 클라이언트가 머무르는 서버입니다.
-* `matchmaker server` : matchmaking을 담당하는 서버입니다.
+* `lobby server` : 로그인 처리를 하며 matchmaking 대기 중인 클라이언트가 머무르는 서버입니다.
+* `matchmaker server` : matchmaking 을 처리하는 서버입니다.
 * `game server` : 매칭된 클라이언트가 머무르는 서버입니다.
 
 flavor에 대한 자세한 내용은 [메뉴얼](https://www.ifunfactory.com/engine/documents/reference/ko/game-management.html#flavors)을 참고해 주세요.
@@ -294,7 +293,6 @@ flavor에 대한 자세한 내용은 [메뉴얼](https://www.ifunfactory.com/eng
 
 ```bash
 $ cd pong-build/debug
-$ ./pong.login-local
 $ ./pong.lobby-local
 $ ./pong.matchmaker-local
 $ ./pong.game-local
@@ -316,15 +314,13 @@ I0109 00:00:00.094981  9203 manifest_handler.cc:742] Starting PongServer
 
 다음으로, 다운받은 Pong Client 프로젝트를 실행시켜 Main씬을 로드합니다. `NetworkManager` 오브젝트 의 Server addr값을 현재 서버의 주소로 변경해주세요.
 
-게임을 실행시키고 **[게스트 로그인]** 혹은 **[페이스북 로그인]** 버튼을 누르면 **클라이언트**에서 **login 서버**로 로그인 요청을 보내게 됩니다. **login 서버**가 요청을 받아 정상적으로 인증되면 클라이언트를 **lobby server**로 이동시키고 클라이언트에서는 **[대전시작]** 버튼이 활성화됩니다. **login 서버**에서는 아래와 같은 로그인 성공 메시지를 출력함을 확인할 수 있습니다.
+게임을 실행시키고 **[게스트 로그인]** 혹은 **[페이스북 로그인]** 버튼을 누르면 **클라이언트**에서 **lobby 서버**로 로그인 요청을 보내게 됩니다. **lobby 서버**가 요청을 받아 정상적으로 인증되면 클라이언트를 **lobby server**로 이동시키고 클라이언트에서는 **[대전시작]** 버튼이 활성화됩니다. **lobby 서버**에서는 아래와 같은 로그인 성공 메시지를 출력함을 확인할 수 있습니다.
 
 ```bash
 ...
-I0109 00:00:00.745265  9461 transport.cc:292] Client plugin version: 186
-I0109 00:00:00.745446  9461 session_service.cc:1262] session created: 3fceb2f1-ed6c-4cfc-a026-58744521df92
-I0109 00:00:00.793865  9462 transport.cc:292] Client plugin version: 186
-W0109 00:00:00.793936  9462 session_impl.cc:1006] message with seq number. but seq number validation disabled: sid=3fceb2f1-ed6c-4cfc-a026-58744521df92, transport_protocol=Tcp
-I0109 00:00:00.795513  9482 event_handlers.cc:66] login succeed : 4f4ccf9233f6cd83978a5bd21ad41e1e61829d81_Editor
+I0412 16:25:51.575713 29140 transport.cc:292] Client plugin version: 186
+I0412 16:25:51.577785 29140 session_service.cc:1262] session created: 3645f3c2-820f-42dc-a6e4-1083cbe8aebc
+I0412 16:25:51.601130 29206 lobby_event_handlers.cc:141] Succeed to login: id=2976b445e50b4257b94d51086f437ec25f358671_Desktop
 ```
 
 **[대전시작]** 버튼을 누르면 **클라이언트**에서 **lobby 서버**로 매치 요청을 보내게 되고, **lobby 서버**는 **matchmaker 서버**에게 매치메이킹을 요청합니다. 매치가 정상적으로 이루어지면 두 **클라이언트**는 **game 서버**로 이동하고 대전이 진행됩니다. 이후 승패가 결정되면 두 클라이언트는 다시 **lobby 서버**로 돌아오게 됩니다.
@@ -333,8 +329,7 @@ I0109 00:00:00.795513  9482 event_handlers.cc:66] login succeed : 4f4ccf9233f6cd
 
 ```bash
 ...
-I0109 00:00:00.627674  9571 pong_server.cc:46] OnJoined 4f4ccf9233f6cd83978a5bd21ad41e1e61829d81_Editor
-I0109 00:00:00.632324  9555 event_handlers.cc:113] OnMatched : Timeout : null
+I0109 00:00:00.632324  9555 event_handlers.cc:271] Failed in matchmaking. Timeout: id=4f4ccf9233f6cd83978a5bd21ad41e1e61829d81_Editor
 ```
 
 **[순위]** 버튼을 누르면 daily 랭킹을 확인할 수 있습니다. 순위는 매일 05시에 갱신됩니다.
