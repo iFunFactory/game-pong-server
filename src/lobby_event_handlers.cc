@@ -136,7 +136,7 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
 
   if (not user) {
     // 새로운 유저를 생성합니다.
-    User::Create(id);
+    user = User::Create(id);
     LOG(INFO) << "Registered new user: id=" << id;
   }
   LOG(INFO) << "Succeed to login: id=" << id;
