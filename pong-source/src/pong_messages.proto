@@ -35,5 +35,5 @@ message PbufHelloMessage
 }
 extend FunMulticastMessage
 {
-  optional PbufHelloMessage pbuf_hello = 9;
+  optional PbufHelloMessage pbuf_hello = 16;
 }
