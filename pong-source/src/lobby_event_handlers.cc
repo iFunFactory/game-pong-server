@@ -290,8 +290,7 @@ void OnMatchmaking(const Ptr<Session> &session, const Json &message) {
   // Matchmaking 을 요청합니다.
   MatchmakingClient::StartMatchmaking(
       kMatch1vs1, id, empty_player_ctxt, match_cb,
-      // 아래 인자는 experimental 버전이 필요합니다.(2017.04.06 기준)
-      // MatchmakingClient::kMostNumberOfPlayers,
+      MatchmakingClient::kMostNumberOfPlayers,
       MatchmakingClient::kNullProgressCallback, kTimeout);
 }
 
