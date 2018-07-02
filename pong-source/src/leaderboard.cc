@@ -148,6 +148,7 @@ void OnGetTopEightList(
     return;
   }
 
+#ifdef USE_JSON
   Json msg;
   for (int i = 0; i < response.total_player_count; ++i) {
     string index = std::to_string(i);
@@ -157,6 +158,8 @@ void OnGetTopEightList(
   }
 
   session->SendMessage("ranklist", msg, kDefaultEncryption, kTcp);
+#else
+#endif
 }
 
 
