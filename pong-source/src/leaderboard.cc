@@ -3,6 +3,13 @@
 #include <funapi.h>
 #include <glog/logging.h>
 
+
+// USE_JSON 은 CMakeLists.txt 에서 세팅됩니다.
+#ifndef USE_JSON
+#include "pong_messages.pb.h"
+#endif
+
+
 DECLARE_string(app_flavor);
 
 
@@ -159,6 +166,15 @@ void OnGetTopEightList(
 
   session->SendMessage("ranklist", msg, kDefaultEncryption, kTcp);
 #else
+  Ptr<FunMessage> msg(new FunMessage);
+  LobbyRankListReply *rank_response
+      = msg->MutableExtension(lobby_rank_list_repl);
+  for (int i = 0; i < response.total_player_count; ++i) {
+    LobbyRankListReply::RankElement *elem = rank_response->add_rank();
+    elem->set_rank(response.records[i].rank);
+    elem->set_score(response.records[i].score);
+    elem->set_id(response.records[i].player_account.id());
+  }
 #endif
 }
 
