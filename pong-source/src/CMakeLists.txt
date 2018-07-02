@@ -55,3 +55,6 @@ include(Funapi-src)
 #
 # E.g., set_target_properties(${PROJECT_NAME} ...)
 ###############################################################################
+
+set_property(TARGET ${PROJECT_NAME} APPEND_STRING PROPERTY COMPILE_FLAGS
+             " -DUSE_JSON")
