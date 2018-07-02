@@ -10,6 +10,13 @@
 #include "pong_types.h"
 
 
+
+// USE_JSON 은 CMakeLists.txt 에서 세팅됩니다.
+#ifndef USE_JSON
+#include "pong_messages.pb.h"
+#endif
+
+
 namespace pong {
 
 // game/lobby_handlers.cc 에 서로 동일한 함수명을 갖는 것들은
@@ -99,6 +106,11 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
     session->SendMessage("login", MakeResponse("nop", "fail to login"),
                          kDefaultEncryption, kTcp);
 #else
+    Ptr<FunMessage> response(new FunMessage);
+    LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
+    login_response->set_result("nop");
+    login_response->set_msg("fail to login");
+    session->SendMessage("login", response, kDefaultEncryption, kTcp);
 #endif
 
     // 아래 로그아웃 처리를 한 후 자동으로 로그인 시킬 수 있지만
@@ -160,6 +172,15 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
 
   session->SendMessage("login", response, kDefaultEncryption, kTcp);
 #else
+  Ptr<FunMessage> response(new FunMessage);
+  LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
+  login_response->set_result("ok");
+  login_response->set_id(id);
+  login_response->set_win_count(user->GetWinCount());
+  login_response->set_lose_count(user->GetLoseCount());
+  login_response->set_cur_record(GetCurrentRecordById(id));
+
+  session->SendMessage("login", response, kDefaultEncryption, kTcp);
 #endif
 }
 
@@ -178,6 +199,12 @@ void OnFacebookAuthenticated(
                          MakeResponse("nop", "facebook authentication error"),
                          kDefaultEncryption, kTcp);
 #else
+    Ptr<FunMessage> response(new FunMessage);
+    LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
+    login_response->set_result("nop");
+    login_response->set_msg("facebook authentication error");
+
+    session->SendMessage("login", response, kDefaultEncryption, kTcp);
 #endif
     return;
   }
@@ -192,6 +219,12 @@ void OnFacebookAuthenticated(
     session->SendMessage("login", MakeResponse("nop", fail_message),
                          kDefaultEncryption, kTcp);
 #else
+    Ptr<FunMessage> response(new FunMessage);
+    LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
+    login_response->set_result("nop");
+    login_response->set_msg(fail_message);
+
+    session->SendMessage("login", response, kDefaultEncryption, kTcp);
 #endif
     return;
   }
@@ -215,6 +248,11 @@ void StartMatchmaking(const Ptr<Session> &session) {
 #ifdef USE_JSON
     session->SendMessage("error", MakeResponse("fail", "not logged in"));
 #else
+    Ptr<FunMessage> response(new FunMessage);
+    PongErrorMessage *error = response->MutableExtension(pong_error);
+    error->set_result("fail");
+    error->set_msg("not logged in");
+    session->SendMessage("error", response);
 #endif
     return;
   }
@@ -226,6 +264,9 @@ void StartMatchmaking(const Ptr<Session> &session) {
 #ifdef USE_JSON
     Json response;
 #else
+    Ptr<FunMessage> response(new FunMessage);
+    LobbyMatchReply *match_reply
+        = response->MutableExtension(lobby_match_repl);
 #endif
 
     if (result == MatchmakingClient::kMRSuccess) {
@@ -248,6 +289,9 @@ void StartMatchmaking(const Ptr<Session> &session) {
       response["A"] = player_a_id;
       response["B"] = player_b_id;
 #else
+      match_reply->set_result("Success");
+      match_reply->set_player1(player_a_id);
+      match_reply->set_player1(player_b_id);
 #endif
 
       if (player_id == player_a_id) {
@@ -269,6 +313,7 @@ void StartMatchmaking(const Ptr<Session> &session) {
 #ifdef USE_JSON
       response = MakeResponse("AlreadyRequested");
 #else
+      match_reply->set_result("AlreadyRequested");
 #endif
     } else if (result == MatchmakingClient::kMRTimeout) {
       // Matchmaking 처리가 시간 초과되었습니다.
@@ -277,6 +322,7 @@ void StartMatchmaking(const Ptr<Session> &session) {
 #ifdef USE_JSON
       response = MakeResponse("Timeout");
 #else
+      match_reply->set_result("Timeout");
 #endif
     } else {
       // Matchmaking 에 오류가 발생했습니다.
@@ -285,12 +331,14 @@ void StartMatchmaking(const Ptr<Session> &session) {
 #ifdef USE_JSON
       response = MakeResponse("Error");
 #else
+      match_reply->set_result("Error");
 #endif
     }
 
 #ifdef USE_JSON
     session->SendMessage("match", response, kDefaultEncryption, kTcp);
 #else
+    session->SendMessage("match", response, kDefaultEncryption, kTcp);
 #endif
   };
 
@@ -382,6 +430,52 @@ void OnRanklistRequested(const Ptr<Session> &session, const Json &message) {
 }
 
 #else
+
+void OnAccountLogin(
+    const Ptr<Session> &session, const Ptr<FunMessage> &message) {
+  // pong_messages.proto 에 정의된 바에 의하면 아래 사항은 일어날 수 없습니다.
+  BOOST_ASSERT(message->HasExtension(lobby_login_req));
+
+  const LobbyLoginRequest &req
+      = message->GetExtension(lobby_login_req);
+  string id = req.id();
+  string type = req.type();
+
+  if(type == "fb") {
+    // Facebook 인증을 먼저 합니다.
+    if (not req.has_access_token()) {
+      LOG(ERROR) << "FB login without an access token!";
+      return;
+    }
+    string access_token = req.access_token();
+    AccountAuthenticationRequest request(
+        "Facebook", id, MakeFacebookAuthenticationKey(access_token));
+    Authenticate(request,
+                 bind(&OnFacebookAuthenticated, id, session, _1, _2, _3));
+  } else {
+    // Guest 는 별도의 인증 없이 로그인 합니다.
+    AccountManager::CheckAndSetLoggedInAsync(id, session, OnLoggedIn);
+  }
+}
+
+
+void OnMatchmaking(
+    const Ptr<Session> &session, const Ptr<FunMessage> &/*message*/) {
+  StartMatchmaking(session);
+}
+
+
+void OnCancelMatchmaking(
+    const Ptr<Session> &session, const Ptr<FunMessage> &/*message*/) {
+  CancelMatchmaking(session);
+}
+
+
+void OnRankListRequested(
+    const Ptr<Session> &session, const Ptr<FunMessage> &message) {
+  GetAndSendTopEightList(session);
+}
+
 #endif
 
 
@@ -403,6 +497,15 @@ void RegisterLobbyEventHandlers() {
   // JSON 버전 Leaderboard 핸들러
   HandlerRegistry::Register("ranklist", OnRanklistRequested);
 #else
+  // Protobuf 버전 Login 핸들러
+  HandlerRegistry::Register2(lobby_login_req, OnAccountLogin);
+
+  // Protobuf 버전 Matchmkaing 핸들러
+  HandlerRegistry::Register2(lobby_match_req, OnMatchmaking);
+  HandlerRegistry::Register2(lobby_cancel_match_req, OnCancelMatchmaking);
+
+  // Protobuf 버전 Leaderboard 핸들러
+  HandlerRegistry::Register2(lobby_rank_list_req, OnRankListRequested);
 #endif
 }
 
