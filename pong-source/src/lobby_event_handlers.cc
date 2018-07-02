@@ -204,29 +204,7 @@ void OnFacebookAuthenticated(
 }
 
 
-#ifdef USE_JSON
-
-// 로그인 메시지를 받으면 불립니다.
-void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
-  string id = message["id"].GetString();
-  string type = message["type"].GetString();
-
-  if(type == "fb") {
-    // Facebook 인증을 먼저 합니다.
-    string access_token = message["access_token"].GetString();
-    AccountAuthenticationRequest request(
-        "Facebook", id, MakeFacebookAuthenticationKey(access_token));
-    Authenticate(request,
-                 bind(&OnFacebookAuthenticated, id, session, _1, _2, _3));
-  } else {
-    // Guest 는 별도의 인증 없이 로그인 합니다.
-    AccountManager::CheckAndSetLoggedInAsync(id, session, OnLoggedIn);
-  }
-}
-
-
-// 매치 메이킹 요청을 수행합니다.
-void OnMatchmaking(const Ptr<Session> &session, const Json &message) {
+void StartMatchmaking(const Ptr<Session> &session) {
   // Matchmaking 최대 대기 시간은 10 초입니다.
   static const WallClock::Duration kTimeout = WallClock::FromSec(10);
 
@@ -234,7 +212,10 @@ void OnMatchmaking(const Ptr<Session> &session, const Json &message) {
   string id;
   if (not session->GetFromContext("id", &id)) {
     LOG(WARNING) << "Failed to request matchmaking. Not logged in.";
+#ifdef USE_JSON
     session->SendMessage("error", MakeResponse("fail", "not logged in"));
+#else
+#endif
     return;
   }
 
@@ -307,7 +288,10 @@ void OnMatchmaking(const Ptr<Session> &session, const Json &message) {
 #endif
     }
 
+#ifdef USE_JSON
     session->SendMessage("match", response, kDefaultEncryption, kTcp);
+#else
+#endif
   };
 
   // 빈 Player Context 를 만듭니다. 지금 구현에서는 Matchmaking 서버가
@@ -324,8 +308,7 @@ void OnMatchmaking(const Ptr<Session> &session, const Json &message) {
 }
 
 
-// 매치메이킹 취소 메시지를 받으면 불립니다.
-void OnCancelMatchmaking(const Ptr<Session> &session, const Json &message) {
+void CancelMatchmaking(const Ptr<Session>& session) {
   // 로그인 한 Id 를 가져옵니다.
   string id;
   if (not session->GetFromContext("id", &id)) {
@@ -358,6 +341,39 @@ void OnCancelMatchmaking(const Ptr<Session> &session, const Json &message) {
   MatchmakingClient::CancelMatchmaking(kMatch1vs1, id, cancel_cb);
 }
 
+
+#ifdef USE_JSON
+
+// 로그인 메시지를 받으면 불립니다.
+void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
+  string id = message["id"].GetString();
+  string type = message["type"].GetString();
+
+  if(type == "fb") {
+    // Facebook 인증을 먼저 합니다.
+    string access_token = message["access_token"].GetString();
+    AccountAuthenticationRequest request(
+        "Facebook", id, MakeFacebookAuthenticationKey(access_token));
+    Authenticate(request,
+                 bind(&OnFacebookAuthenticated, id, session, _1, _2, _3));
+  } else {
+    // Guest 는 별도의 인증 없이 로그인 합니다.
+    AccountManager::CheckAndSetLoggedInAsync(id, session, OnLoggedIn);
+  }
+}
+
+
+// 매치 메이킹 요청을 수행합니다.
+void OnMatchmaking(const Ptr<Session> &session, const Json &/*message*/) {
+  // 실제 matchmaking 구현을 호출한다.
+  StartMatchmaking(session);
+}
+
+
+// 매치메이킹 취소 메시지를 받으면 불립니다.
+void OnCancelMatchmaking(const Ptr<Session> &session, const Json &/*message*/) {
+  CancelMatchmaking(session);
+}
 
 
 // TOP 8 랭킹 메시지를 받으면 불립니다.
