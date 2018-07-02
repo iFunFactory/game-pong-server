@@ -118,10 +118,7 @@ void FreeUser(const Ptr<Session> &session) {
 }  // unnamed namesapce
 
 
-#ifdef USE_JSON
-
-// 게임 플레이 준비 메시지를 받으면 불립니다.
-void OnReadySignal(const Ptr<Session> &session, const Json &message) {
+void HandleReadySignal(const Ptr<Session> &session) {
   session->AddToContext("ready", 1);
   string opponent_id;
   session->GetFromContext("opponent", &opponent_id);
@@ -132,16 +129,73 @@ void OnReadySignal(const Ptr<Session> &session, const Json &message) {
     opponent_session->GetFromContext("ready", &is_opponent_ready);
     if (is_opponent_ready == 1) {
       // 둘 다 준비가 되었습니다. 시작 신호를 보냅니다.
+#ifdef USE_JSON
       Json response = MakeResponse("ok");
       session->SendMessage("start", response);
       opponent_session->SendMessage("start", response);
+#else
+#endif
     }
   } else {
     // 상대가 접속을 종료했습니다.
+#ifdef USE_JSON
     session->SendMessage("match", MakeResponse("opponent disconnected"),
                          kDefaultEncryption, kTcp);
+#else
+#endif
     return;
   }
+}
+
+
+void HandleResultRequest(const Ptr<Session> &session) {
+  // 패배한 쪽만 result를 보내도록 되어있습니다.
+
+  // 내 아이디를 가져옵니다.
+  string my_id;
+  session->GetFromContext("id", &my_id);
+
+  // 상대방의 아이디와 세션을 가져옵니다.
+  string opponent_id;
+  session->GetFromContext("opponent", &opponent_id);
+  Ptr<Session> opponent_session = AccountManager::FindLocalSession(opponent_id);
+
+  FetchAndUpdateMatchRecord(opponent_id, my_id);
+
+  if (opponent_session && opponent_session->IsTransportAttached()) {
+    // 상대에게 승리했음을 알립니다.
+#ifdef USE_JSON
+    opponent_session->SendMessage("result", MakeResponse("win"));
+#else
+#endif
+    IncreaseCurWinCount(opponent_id);
+  }
+
+  // 패배 확인 메세지를 보냅니다.
+#ifdef USE_JSON
+  session->SendMessage("result", MakeResponse("lose"));
+#else
+#endif
+  ResetCurWinCount(my_id);
+
+  // 각각 상대방에 대한 정보를 삭제합니다.
+  opponent_session->DeleteFromContext("opponent");
+  session->DeleteFromContext("opponent");
+
+  // 두 플레이어를 lobby서버로 이동시킵니다.
+  MoveServerByTag(opponent_session, "lobby");
+  MoveServerByTag(session, "lobby");
+
+  FreeUser(opponent_session);
+  FreeUser(session);
+}
+
+
+#ifdef USE_JSON
+
+// 게임 플레이 준비 메시지를 받으면 불립니다.
+void OnReadySignal(const Ptr<Session> &session, const Json &/*message*/) {
+  HandleReadySignal(session);
 }
 
 
@@ -158,40 +212,8 @@ void OnRelayRequested(const Ptr<Session> &session, const Json &message) {
 
 
 // 결과 요청 메시지를 받으면 불립니다.
-void OnResultRequested(const Ptr<Session> &session, const Json &message) {
-  // 패배한 쪽만 result를 보내도록 되어있습니다.
-
-  // 내 아이디를 가져옵니다.
-  string my_id;
-  session->GetFromContext("id", &my_id);
-
-  // 상대방의 아이디와 세션을 가져옵니다.
-  string opponent_id;
-  session->GetFromContext("opponent", &opponent_id);
-  Ptr<Session> opponent_session = AccountManager::FindLocalSession(opponent_id);
-
-  FetchAndUpdateMatchRecord(opponent_id, my_id);
-
-  if (opponent_session && opponent_session->IsTransportAttached()) {
-    // 상대에게 승리했음을 알립니다.
-    opponent_session->SendMessage("result", MakeResponse("win"));
-    IncreaseCurWinCount(opponent_id);
-  }
-
-  // 패배 확인 메세지를 보냅니다.
-  session->SendMessage("result", message);
-  ResetCurWinCount(my_id);
-
-  // 각각 상대방에 대한 정보를 삭제합니다.
-  opponent_session->DeleteFromContext("opponent");
-  session->DeleteFromContext("opponent");
-
-  // 두 플레이어를 lobby서버로 이동시킵니다.
-  MoveServerByTag(opponent_session, "lobby");
-  MoveServerByTag(session, "lobby");
-
-  FreeUser(opponent_session);
-  FreeUser(session);
+void OnResultRequested(const Ptr<Session> &session, const Json &/*message*/) {
+  HandleResultRequest(session);
 }
 
 #else
