@@ -56,5 +56,6 @@ include(Funapi-src)
 # E.g., set_target_properties(${PROJECT_NAME} ...)
 ###############################################################################
 
+# Protobuf 를 쓰기 위해서는 아래 내용을 지우고 빌드할 것.
 set_property(TARGET ${PROJECT_NAME} APPEND_STRING PROPERTY COMPILE_FLAGS
              " -DUSE_JSON")
