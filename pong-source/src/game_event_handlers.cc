@@ -103,8 +103,11 @@ void FreeUser(const Ptr<Session> &session) {
   IncreaseCurWinCount(opponent_id);
   ResetCurWinCount(my_id);
 
+#ifdef USE_JSON
   opponent_session->SendMessage("result", MakeResponse("win"),
                                 kDefaultEncryption, kTcp);
+#else
+#endif
 
   MoveServerByTag(opponent_session, "lobby");
 
@@ -114,6 +117,8 @@ void FreeUser(const Ptr<Session> &session) {
 
 }  // unnamed namesapce
 
+
+#ifdef USE_JSON
 
 // 게임 플레이 준비 메시지를 받으면 불립니다.
 void OnReadySignal(const Ptr<Session> &session, const Json &message) {
@@ -189,15 +194,21 @@ void OnResultRequested(const Ptr<Session> &session, const Json &message) {
   FreeUser(session);
 }
 
+#else
+#endif
+
 
 // 게임 서버 핸들러들을 등록합니다.
 void RegisterGameEventHandlers() {
   HandlerRegistry::Install2(OnSessionOpened, OnSessionClosed);
   HandlerRegistry::RegisterTcpTransportDetachedHandler(OnTransportTcpDetached);
 
+#ifdef USE_JSON
   HandlerRegistry::Register("ready", OnReadySignal);
   HandlerRegistry::Register("relay", OnRelayRequested);
   HandlerRegistry::Register("result", OnResultRequested);
+#else
+#endif
 }
 
 }  // namespace pong
