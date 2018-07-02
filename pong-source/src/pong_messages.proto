@@ -11,19 +11,90 @@
 import "funapi/network/fun_message.proto";
 
 // Your specific message class.
-message PbufEchoMessage {
-  required string msg = 1;
+message LobbyLoginRequest {
+  required string id = 1;
+  required string type = 2;  // "fb" 외에는 모두 게스트 인증으로 처리
+  optional string access_token = 3;  // "fb" 일 경우 클라이언트로부터 받는 토큰 값
 }
 
 
-message PbufAnotherMessage {
-  optional string msg = 1;
+message LobbyLoginReply {
+  required string result = 1;
+  optional string msg = 2;
+  optional string id = 3;
+  optional int32 win_count = 4;
+  optional int32 lose_count = 5;
+  optional int32 cur_record = 6;
+}
+
+
+message LobbyMatchRequest {
+}
+
+
+message LobbyCancelMatchRequest {
+}
+
+
+message LobbyMatchReply {
+  required string result = 1;
+  optional string msg = 2;
+  optional string player1 = 3;
+  optional string player2 = 4;
+}
+
+
+message LobbyRankListRequest {
+}
+
+
+message LobbyRankListReply {
+
+  message RankElement {
+    required int64 rank = 1;
+    required int64 score = 2;
+    required string id = 3;
+  }
+
+  required string result = 1;
+  optional string msg = 2;
+  repeated RankElement rank = 3;
+}
+
+
+message GameStartMessage {
+  required string result = 1;
+  optional string msg = 2;
+}
+
+
+message GameResultMessage {
+  required string result = 1;
+  optional string msg = 2;
+}
+
+
+message PongErrorMessage {
+  required string result = 1;
+  optional string msg = 2;
 }
 
 
 extend FunMessage {
-  optional PbufEchoMessage pbuf_echo = 16;
-  optional PbufAnotherMessage pbuf_another = 17;
+  optional LobbyLoginRequest lobby_login_req = 20;
+  optional LobbyLoginReply lobby_login_repl = 21;
+
+  optional LobbyMatchRequest lobby_match_req = 22;
+  optional LobbyCancelMatchRequest lobby_cancel_match_req = 23;
+  optional LobbyMatchReply lobby_match_repl = 24;
+
+  optional LobbyRankListRequest lobby_rank_list_req = 25;
+  optional LobbyRankListReply lobby_rank_list_repl = 26;
+
+  optional GameStartMessage game_start = 30;
+  optional GameResultMessage game_result = 31;
+
+  optional PongErrorMessage pong_error = 63;
 }
 
 
