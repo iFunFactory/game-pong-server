@@ -95,8 +95,11 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
     // (1. 같은 ID 로 이미 다른 Session 이 로그인 했거나,
     //  2. 이 Session 이 이미 로그인 되어 있는 경우)
     LOG(INFO) << "Failed to login: id=" << id;
+#ifdef USE_JSON
     session->SendMessage("login", MakeResponse("nop", "fail to login"),
                          kDefaultEncryption, kTcp);
+#else
+#endif
 
     // 아래 로그아웃 처리를 한 후 자동으로 로그인 시킬 수 있지만
     // 일단 클라이언트에서 다시 시도하도록 합니다.
@@ -148,6 +151,7 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
   session->AddToContext("id", id);
 
   // 응답을 보냅니다.
+#ifdef USE_JSON
   Json response = MakeResponse("ok");
   response["id"] = id;
   response["winCount"] = user->GetWinCount();
@@ -155,6 +159,8 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
   response["curRecord"] = GetCurrentRecordById(id);
 
   session->SendMessage("login", response, kDefaultEncryption, kTcp);
+#else
+#endif
 }
 
 
@@ -167,9 +173,12 @@ void OnFacebookAuthenticated(
     // 인증에 오류가 있습니다. 장애 오류입니다.
     LOG(ERROR) << "Failed to authenticate. Facebook authentication error: "
                << "id=" << fb_uid;
+#ifdef USE_JSON
     session->SendMessage("login",
                          MakeResponse("nop", "facebook authentication error"),
                          kDefaultEncryption, kTcp);
+#else
+#endif
     return;
   }
 
@@ -179,8 +188,11 @@ void OnFacebookAuthenticated(
               << "id=" << fb_uid;
     string fail_message = "facebook authentication failed: " +
                           response.reason_description;
+#ifdef USE_JSON
     session->SendMessage("login", MakeResponse("nop", fail_message),
                          kDefaultEncryption, kTcp);
+#else
+#endif
     return;
   }
 
@@ -191,6 +203,8 @@ void OnFacebookAuthenticated(
   AccountManager::CheckAndSetLoggedInAsync(fb_uid, session, OnLoggedIn);
 }
 
+
+#ifdef USE_JSON
 
 // 로그인 메시지를 받으면 불립니다.
 void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
@@ -228,7 +242,10 @@ void OnMatchmaking(const Ptr<Session> &session, const Json &message) {
   auto match_cb = [session](const string &player_id,
                             const MatchmakingClient::Match &match,
                             MatchmakingClient::MatchResult result) {
+#ifdef USE_JSON
     Json response;
+#else
+#endif
 
     if (result == MatchmakingClient::kMRSuccess) {
       // Matchmaking 에 성공했습니다.
@@ -245,9 +262,12 @@ void OnMatchmaking(const Ptr<Session> &session, const Json &message) {
         opponent_id = match.context["B"].GetString();
       }
 
+#ifdef USE_JSON
       response = MakeResponse("Success");
       response["A"] = player_a_id;
       response["B"] = player_b_id;
+#else
+#endif
 
       if (player_id == player_a_id) {
         session->AddToContext("opponent", player_b_id);
@@ -265,17 +285,26 @@ void OnMatchmaking(const Ptr<Session> &session, const Json &message) {
       LOG(INFO) << "Failed in matchmaking. Already requested: id="
                 << player_id;
       session->AddToContext("matching", "failed");
+#ifdef USE_JSON
       response = MakeResponse("AlreadyRequested");
+#else
+#endif
     } else if (result == MatchmakingClient::kMRTimeout) {
       // Matchmaking 처리가 시간 초과되었습니다.
       LOG(INFO) << "Failed in matchmaking. Timeout: id=" << player_id;
       session->AddToContext("matching", "failed");
+#ifdef USE_JSON
       response = MakeResponse("Timeout");
+#else
+#endif
     } else {
       // Matchmaking 에 오류가 발생했습니다.
       LOG(ERROR) << "Failed in matchmaking. Erorr: id=" << player_id;
       session->AddToContext("matching", "failed");
+#ifdef USE_JSON
       response = MakeResponse("Error");
+#else
+#endif
     }
 
     session->SendMessage("match", response, kDefaultEncryption, kTcp);
@@ -336,23 +365,29 @@ void OnRanklistRequested(const Ptr<Session> &session, const Json &message) {
   GetAndSendTopEightList(session);
 }
 
+#else
+#endif
+
 
 // 로비 서버 핸들러들을 등록합니다.
 void RegisterLobbyEventHandlers() {
   HandlerRegistry::Install2(OnSessionOpened, OnSessionClosed);
   HandlerRegistry::RegisterTcpTransportDetachedHandler(OnTransportTcpDetached);
 
-  // Login 핸들러
+#ifdef USE_JSON
+  // JSON 버전 Login 핸들러
   JsonSchema login_msg(JsonSchema::kObject,
                        JsonSchema("id", JsonSchema::kString, true));
   HandlerRegistry::Register("login", OnAccountLogin, login_msg);
 
-  // Matchmaking 핸들러
+  // JSON 버전 Matchmaking 핸들러
   HandlerRegistry::Register("match", OnMatchmaking);
   HandlerRegistry::Register("cancelmatch", OnCancelMatchmaking);
 
-  // Leaderboard 핸들러
+  // JSON 버전 Leaderboard 핸들러
   HandlerRegistry::Register("ranklist", OnRanklistRequested);
+#else
+#endif
 }
 
 }  // namespace pong
