@@ -9,6 +9,13 @@
 #include "pong_loggers.h"
 #include "pong_types.h"
 
+
+// USE_JSON 은 CMakeLists.txt 에서 세팅됩니다.
+#ifndef USE_JSON
+#include "pong_messages.pb.h"
+#endif
+
+
 DECLARE_string(app_flavor);
 
 
@@ -107,6 +114,10 @@ void FreeUser(const Ptr<Session> &session) {
   opponent_session->SendMessage("result", MakeResponse("win"),
                                 kDefaultEncryption, kTcp);
 #else
+  Ptr<FunMessage> msg(new FunMessage);
+  GameResultMessage *result_msg = msg->MutableExtension(game_result);
+  result_msg->set_result("win");
+  opponent_session->SendMessage("result", msg);
 #endif
 
   MoveServerByTag(opponent_session, "lobby");
@@ -134,6 +145,10 @@ void HandleReadySignal(const Ptr<Session> &session) {
       session->SendMessage("start", response);
       opponent_session->SendMessage("start", response);
 #else
+      Ptr<FunMessage> msg(new FunMessage);
+      GameStartMessage *start_msg = msg->MutableExtension(game_start);
+      start_msg->set_result("ok");
+      opponent_session->SendMessage("start", msg);
 #endif
     }
   } else {
@@ -142,6 +157,10 @@ void HandleReadySignal(const Ptr<Session> &session) {
     session->SendMessage("match", MakeResponse("opponent disconnected"),
                          kDefaultEncryption, kTcp);
 #else
+    Ptr<FunMessage> msg(new FunMessage);
+    LobbyMatchReply *match_msg = msg->MutableExtension(lobby_match_repl);
+    match_msg->set_result("opponent disconnected");
+    session->SendMessage("match", msg);
 #endif
     return;
   }
@@ -167,6 +186,10 @@ void HandleResultRequest(const Ptr<Session> &session) {
 #ifdef USE_JSON
     opponent_session->SendMessage("result", MakeResponse("win"));
 #else
+    Ptr<FunMessage> msg(new FunMessage);
+    GameResultMessage *result_msg = msg->MutableExtension(game_result);
+    result_msg->set_result("win");
+    opponent_session->SendMessage("result", msg);
 #endif
     IncreaseCurWinCount(opponent_id);
   }
@@ -175,6 +198,10 @@ void HandleResultRequest(const Ptr<Session> &session) {
 #ifdef USE_JSON
   session->SendMessage("result", MakeResponse("lose"));
 #else
+  Ptr<FunMessage> msg(new FunMessage);
+  GameResultMessage *result_msg = msg->MutableExtension(game_result);
+  result_msg->set_result("lose");
+  opponent_session->SendMessage("result", msg);
 #endif
   ResetCurWinCount(my_id);
 
@@ -217,6 +244,34 @@ void OnResultRequested(const Ptr<Session> &session, const Json &/*message*/) {
 }
 
 #else
+
+// 게임 플레이 준비 메시지를 받으면 불립니다.
+void OnReadySignal(
+    const Ptr<Session> &session, const Ptr<FunMessage> &/*message*/) {
+  HandleReadySignal(session);
+}
+
+
+// 릴레이 메시지를 받으면 불립니다. TCP, UDP 둘 다 이 함수로 처리합니다.
+void OnRelayRequested(
+    const Ptr<Session> &session, const Ptr<FunMessage> &message) {
+  string opponent_id;
+  session->GetFromContext("opponent", &opponent_id);
+  Ptr<Session> opponent_session = AccountManager::FindLocalSession(opponent_id);
+  if (opponent_session && opponent_session->IsTransportAttached()) {
+    LOG(INFO) << "message relay: session_id=" << session->id();
+    opponent_session->SendMessage("relay", message);
+  }
+
+}
+
+
+// 결과 요청 메시지를 받으면 불립니다.
+void OnResultRequested(
+    const Ptr<Session> &session, const Ptr<FunMessage> &/*message*/) {
+  HandleResultRequest(session);
+}
+
 #endif
 
 
@@ -230,6 +285,9 @@ void RegisterGameEventHandlers() {
   HandlerRegistry::Register("relay", OnRelayRequested);
   HandlerRegistry::Register("result", OnResultRequested);
 #else
+  HandlerRegistry::Register2("ready", OnReadySignal);
+  HandlerRegistry::Register2("relay", OnRelayRequested);
+  HandlerRegistry::Register2("result", OnResultRequested);
 #endif
 }
 
