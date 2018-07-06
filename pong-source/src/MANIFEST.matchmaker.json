@@ -39,6 +39,9 @@
             "rpc_message_logging_level": 0,
             "enable_rpc_reply_checker": true
           },
+          "Curl": {
+            "curl_threads_size": 1
+          },
           "ZookeeperClient": {
             "zookeeper_nodes": "localhost:2181"
           },
