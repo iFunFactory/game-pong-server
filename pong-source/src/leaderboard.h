@@ -9,7 +9,8 @@ namespace pong {
 int GetCurrentRecordById(const string &id);
 void IncreaseCurWinCount(const string &id);
 void ResetCurWinCount(const string &id);
-void GetAndSendTopEightList(const Ptr<Session> session);
+void GetAndSendTopEightList(
+    const Ptr<Session> session, EncodingScheme encoding);
 
 }  // namespace pong
 

@@ -3,11 +3,7 @@
 #include <funapi.h>
 #include <glog/logging.h>
 
-
-// USE_JSON 은 CMakeLists.txt 에서 세팅됩니다.
-#ifndef USE_JSON
 #include "pong_messages.pb.h"
-#endif
 
 
 DECLARE_string(app_flavor);
@@ -157,43 +153,48 @@ void ResetCurWinCount(const string &id) {
 // 1 일 최대 연승 기록 TOP 8 을 가져온 후 불립니다.
 void OnGetTopEightList(
     const Ptr<Session> session, const LeaderboardQueryRequest &request,
-    const LeaderboardQueryResponse &response, const bool &error) {
+    const LeaderboardQueryResponse &response, const bool &error,
+    EncodingScheme encoding) {
   if (error) {
     LOG(ERROR) << "Failed to query top 8. Leaderboard system error.";
     return;
   }
 
-#ifdef USE_JSON
-  Json msg;
-  for (int i = 0; i < response.total_player_count; ++i) {
-    string index = std::to_string(i);
-    msg[index]["rank"] = response.records[i].rank;
-    msg[index]["score"] = response.records[i].score;
-    msg[index]["id"] = response.records[i].player_account.id();
-  }
+  if (encoding == kJsonEncoding) {
+    Json msg;
+    for (int i = 0; i < response.total_player_count; ++i) {
+      string index = std::to_string(i);
+      msg[index]["rank"] = response.records[i].rank;
+      msg[index]["score"] = response.records[i].score;
+      msg[index]["id"] = response.records[i].player_account.id();
+    }
 
-  session->SendMessage("ranklist", msg, kDefaultEncryption);
-#else
-  Ptr<FunMessage> msg(new FunMessage);
-  LobbyRankListReply *rank_response
-      = msg->MutableExtension(lobby_rank_list_repl);
-  for (int i = 0; i < response.total_player_count; ++i) {
-    LobbyRankListReply::RankElement *elem = rank_response->add_rank();
-    elem->set_rank(response.records[i].rank);
-    elem->set_score(response.records[i].score);
-    elem->set_id(response.records[i].player_account.id());
+    session->SendMessage("ranklist", msg, kDefaultEncryption);
+  } else {
+    Ptr<FunMessage> msg(new FunMessage);
+    LobbyRankListReply *rank_response
+        = msg->MutableExtension(lobby_rank_list_repl);
+    rank_response->set_result("Success");
+    for (int i = 0; i < response.total_player_count; ++i) {
+      LobbyRankListReply::RankElement *elem = rank_response->add_rank();
+      elem->set_rank(response.records[i].rank);
+      elem->set_score(response.records[i].score);
+      elem->set_id(response.records[i].player_account.id());
+    }
+    session->SendMessage("ranklist", msg, kDefaultEncryption);
   }
-#endif
 }
 
 
 // 1 일 최대 연승 기록 TOP 8 을 세션으로 전송합니다.
-void GetAndSendTopEightList(const Ptr<Session> session) {
+void GetAndSendTopEightList(const Ptr<Session> session,
+                            EncodingScheme encoding) {
   LeaderboardQueryRequest request(
     kPlayerRecordWinCount, kDaily,
     LeaderboardRange(LeaderboardRange::kFromTop, 0, 7),
     LeaderboardQueryRequest::kStdCompetition);
-  GetLeaderboard(request, bind(&OnGetTopEightList, session, _1, _2, _3));
+  GetLeaderboard(
+      request, bind(&OnGetTopEightList, session, _1, _2, _3, encoding));
 }
 
 } // namespace pong
