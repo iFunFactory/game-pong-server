@@ -46,7 +46,7 @@ set(PACKAGE_WITH_BUILD_NUMBER_FROM_GIT false)
 set(PACKAGE_WITH_BUILD_NUMBER_FROM_SVN false)
 
 # Generate .DLL for Unity Engine
-set(GENERATE_UNITY_PROTOBUF_DLL false)
+set(GENERATE_UNITY_PROTOBUF_DLL true)
 
 
 # Sets if you want different flavors.
