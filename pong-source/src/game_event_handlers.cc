@@ -112,7 +112,7 @@ void FreeUser(const Ptr<Session> &session) {
 
 #ifdef USE_JSON
   opponent_session->SendMessage("result", MakeResponse("win"),
-                                kDefaultEncryption, kTcp);
+                                kDefaultEncryption);
 #else
   Ptr<FunMessage> msg(new FunMessage);
   GameResultMessage *result_msg = msg->MutableExtension(game_result);
@@ -155,7 +155,7 @@ void HandleReadySignal(const Ptr<Session> &session) {
     // 상대가 접속을 종료했습니다.
 #ifdef USE_JSON
     session->SendMessage("match", MakeResponse("opponent disconnected"),
-                         kDefaultEncryption, kTcp);
+                         kDefaultEncryption);
 #else
     Ptr<FunMessage> msg(new FunMessage);
     LobbyMatchReply *match_msg = msg->MutableExtension(lobby_match_repl);

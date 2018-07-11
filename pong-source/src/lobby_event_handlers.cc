@@ -104,13 +104,13 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
     LOG(INFO) << "Failed to login: id=" << id;
 #ifdef USE_JSON
     session->SendMessage("login", MakeResponse("nop", "fail to login"),
-                         kDefaultEncryption, kTcp);
+                         kDefaultEncryption);
 #else
     Ptr<FunMessage> response(new FunMessage);
     LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
     login_response->set_result("nop");
     login_response->set_msg("fail to login");
-    session->SendMessage("login", response, kDefaultEncryption, kTcp);
+    session->SendMessage("login", response, kDefaultEncryption);
 #endif
 
     // 아래 로그아웃 처리를 한 후 자동으로 로그인 시킬 수 있지만
@@ -170,7 +170,7 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
   response["loseCount"] = user->GetLoseCount();
   response["curRecord"] = GetCurrentRecordById(id);
 
-  session->SendMessage("login", response, kDefaultEncryption, kTcp);
+  session->SendMessage("login", response, kDefaultEncryption);
 #else
   Ptr<FunMessage> response(new FunMessage);
   LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
@@ -180,7 +180,7 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success) {
   login_response->set_lose_count(user->GetLoseCount());
   login_response->set_cur_record(GetCurrentRecordById(id));
 
-  session->SendMessage("login", response, kDefaultEncryption, kTcp);
+  session->SendMessage("login", response, kDefaultEncryption);
 #endif
 }
 
@@ -197,14 +197,14 @@ void OnFacebookAuthenticated(
 #ifdef USE_JSON
     session->SendMessage("login",
                          MakeResponse("nop", "facebook authentication error"),
-                         kDefaultEncryption, kTcp);
+                         kDefaultEncryption);
 #else
     Ptr<FunMessage> response(new FunMessage);
     LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
     login_response->set_result("nop");
     login_response->set_msg("facebook authentication error");
 
-    session->SendMessage("login", response, kDefaultEncryption, kTcp);
+    session->SendMessage("login", response, kDefaultEncryption);
 #endif
     return;
   }
@@ -217,14 +217,14 @@ void OnFacebookAuthenticated(
                           response.reason_description;
 #ifdef USE_JSON
     session->SendMessage("login", MakeResponse("nop", fail_message),
-                         kDefaultEncryption, kTcp);
+                         kDefaultEncryption);
 #else
     Ptr<FunMessage> response(new FunMessage);
     LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
     login_response->set_result("nop");
     login_response->set_msg(fail_message);
 
-    session->SendMessage("login", response, kDefaultEncryption, kTcp);
+    session->SendMessage("login", response, kDefaultEncryption);
 #endif
     return;
   }
@@ -336,9 +336,9 @@ void StartMatchmaking(const Ptr<Session> &session) {
     }
 
 #ifdef USE_JSON
-    session->SendMessage("match", response, kDefaultEncryption, kTcp);
+    session->SendMessage("match", response, kDefaultEncryption);
 #else
-    session->SendMessage("match", response, kDefaultEncryption, kTcp);
+    session->SendMessage("match", response, kDefaultEncryption);
 #endif
   };
 
@@ -382,7 +382,7 @@ void CancelMatchmaking(const Ptr<Session>& session) {
       response = MakeResponse("Error");
     }
 
-    session->SendMessage("match", response, kDefaultEncryption, kTcp);
+    session->SendMessage("match", response, kDefaultEncryption);
   };
 
   // Matchmaking 취소를 요청합니다.

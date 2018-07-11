@@ -172,7 +172,7 @@ void OnGetTopEightList(
     msg[index]["id"] = response.records[i].player_account.id();
   }
 
-  session->SendMessage("ranklist", msg, kDefaultEncryption, kTcp);
+  session->SendMessage("ranklist", msg, kDefaultEncryption);
 #else
   Ptr<FunMessage> msg(new FunMessage);
   LobbyRankListReply *rank_response
