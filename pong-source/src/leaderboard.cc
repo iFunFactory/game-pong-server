@@ -60,6 +60,11 @@ void OnNewRecordSubmitted(
       LOG(INFO) << "New record: id=" << id << ", score=" << response.new_score;
       break;
     }
+    case kNewRecordMonthly: {
+      LOG(INFO) << "New monthly record: id=" << id << ", score="
+                << response.new_score;
+      break;
+    }
     case kNewRecordWeekly: {
       LOG(INFO) << "New weekly record: id=" << id << ", score="
                 << response.new_score;
@@ -100,13 +105,16 @@ void OnIncreaseCurWinCountSubmitted(
 
   switch (response.result) {
     case kNewRecord:
+    case kNewRecordMonthly:
     case kNewRecordWeekly:
     case kNewRecordDaily:
     case kNone: {
       // 1 씩 증가하기 떄문에 항상 new record 가 됩니다.
       break;
     } default: {
-       BOOST_ASSERT(false);
+      LOG(ERROR) << "Ignoring invalid leaderboard response: "
+                 << response.result;
+      return;
     }
   }
 
