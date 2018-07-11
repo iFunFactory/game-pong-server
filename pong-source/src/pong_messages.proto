@@ -74,6 +74,16 @@ message GameResultMessage {
 }
 
 
+message GameRelayMessage {
+  optional float ballX = 1;
+  optional float ballY = 2;
+  optional float ballVX = 3;
+  optional float ballVY = 4;
+  optional float barX = 5;
+  optional float timeSeq = 6;
+}
+
+
 message PongErrorMessage {
   required string result = 1;
   optional string msg = 2;
@@ -93,6 +103,7 @@ extend FunMessage {
 
   optional GameStartMessage game_start = 30;
   optional GameResultMessage game_result = 31;
+  optional GameRelayMessage game_relay = 32;
 
   optional PongErrorMessage pong_error = 63;
 }

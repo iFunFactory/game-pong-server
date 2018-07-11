@@ -33,10 +33,10 @@
             "io_service_threads_size": 4
           },
           "SessionService": {
-            "tcp_json_port": 7012,
-            "udp_json_port": 7013,
+            "tcp_json_port": 0,
+            "udp_json_port": 0,
             "http_json_port": 0,
-            "tcp_protobuf_port": 0,
+            "tcp_protobuf_port": 7012,
             "udp_protobuf_port": 0,
             "http_protobuf_port": 0,
             "session_timeout_in_second" : 3600,
@@ -48,7 +48,7 @@
             "http_encryptions": [],
             "disable_tcp_nagle": false,
             "enable_http_message_list": true,
-            "session_message_logging_level": 0,
+            "session_message_logging_level": 2,
             "enable_per_message_metering_in_counter": false,
             "json_protocol_schema_dir": "json_protocols",
             "ping_sampling_interval_in_second": 0,
@@ -96,7 +96,7 @@
             "use_leaderboard" : true,
             "leaderboard_agents": {
               "" : {
-                "address": "127.0.0.1:12820",
+                "address": "10.10.1.20:12820",
                 "fallback_servers": []
               }
             }
