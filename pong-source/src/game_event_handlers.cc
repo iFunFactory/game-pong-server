@@ -154,10 +154,15 @@ void HandleReadySignal(const Ptr<Session> &session, EncodingScheme encoding) {
         Ptr<FunMessage> msg(new FunMessage);
         GameStartMessage *start_msg = msg->MutableExtension(game_start);
         start_msg->set_result("ok");
+        session->SendMessage("start", msg);
         opponent_session->SendMessage("start", msg);
       }
     }
-  } else {
+  }
+  /*
+  //TODO : 상대가 나간건지 아직 접속 전인지 알 수 없기 때문에
+  //ready 상태를 동기화는 방법을 변경하던가, 5초 후에 다시 확인하자
+  else {
     // 상대가 접속을 종료했습니다.
     if (encoding == kJsonEncoding) {
       session->SendMessage("match", MakeResponse("opponent disconnected"),
@@ -170,6 +175,7 @@ void HandleReadySignal(const Ptr<Session> &session, EncodingScheme encoding) {
     }
     return;
   }
+  */
 }
 
 
@@ -189,7 +195,6 @@ void HandleResultRequest(const Ptr<Session> &session, EncodingScheme encoding) {
 
   if (opponent_session && opponent_session->IsTransportAttached()) {
     // 상대에게 승리했음을 알립니다.
-
     if (encoding == kJsonEncoding) {
       opponent_session->SendMessage("result", MakeResponse("win"));
     } else {
@@ -208,7 +213,7 @@ void HandleResultRequest(const Ptr<Session> &session, EncodingScheme encoding) {
     Ptr<FunMessage> msg(new FunMessage);
     GameResultMessage *result_msg = msg->MutableExtension(game_result);
     result_msg->set_result("lose");
-    opponent_session->SendMessage("result", msg);
+    session->SendMessage("result", msg);
   }
   ResetCurWinCount(my_id);
 
