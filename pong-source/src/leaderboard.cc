@@ -164,9 +164,9 @@ void OnGetTopEightList(
     Json msg;
     for (int i = 0; i < response.total_player_count; ++i) {
       string index = std::to_string(i);
-      msg[index]["rank"] = response.records[i].rank;
-      msg[index]["score"] = response.records[i].score;
-      msg[index]["id"] = response.records[i].player_account.id();
+      msg["ranks"][index]["rank"] = response.records[i].rank;
+      msg["ranks"][index]["score"] = response.records[i].score;
+      msg["ranks"][index]["id"] = response.records[i].player_account.id();
     }
 
     session->SendMessage("ranklist", msg, kDefaultEncryption);
