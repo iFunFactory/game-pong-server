@@ -2,13 +2,13 @@
 
 이 프로젝트는 iFun Engine을 사용하는 Unity3d 사용자를 위한 샘플 게임 서버입니다. 해당 게임 서버를 테스트하기 위한 환경은 다음과 같습니다.
 
-* Ubuntu 14.04 혹은 16.04, CentOS 6 혹은 7
+* 권장 운영체제 Ubuntu 16.04
 * mysql 혹은 mariadb
 * zookeeper
 * funapi-authenticator
 * funapi-leaderboard
 
-**해당 문서에서는 Ubuntu 14.04에서 설정하는 방법을 서술합니다.**
+**해당 문서에서는 Ubuntu 16.04에서 설정하는 방법을 서술합니다.**
 
 ## 목차
 
