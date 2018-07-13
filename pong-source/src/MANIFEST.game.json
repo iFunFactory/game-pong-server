@@ -96,7 +96,7 @@
             "use_leaderboard" : true,
             "leaderboard_agents": {
               "" : {
-                "address": "10.10.1.20:12820",
+                "address": "127.0.0.1:12820",
                 "fallback_servers": []
               }
             }

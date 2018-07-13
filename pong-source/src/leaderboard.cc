@@ -162,7 +162,7 @@ void OnGetTopEightList(
 
   if (encoding == kJsonEncoding) {
     Json msg;
-    for (int i = 0; i < response.total_player_count; ++i) {
+    for (size_t i = 0; i < response.records.size(); ++i) {
       string index = std::to_string(i);
       msg["ranks"][index]["rank"] = response.records[i].rank;
       msg["ranks"][index]["score"] = response.records[i].score;
@@ -175,7 +175,7 @@ void OnGetTopEightList(
     LobbyRankListReply *rank_response
         = msg->MutableExtension(lobby_rank_list_repl);
     rank_response->set_result("Success");
-    for (int i = 0; i < response.total_player_count; ++i) {
+    for (size_t i = 0; i < response.records.size(); ++i) {
       LobbyRankListReply::RankElement *elem = rank_response->add_rank();
       elem->set_rank(response.records[i].rank);
       elem->set_score(response.records[i].score);
