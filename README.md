@@ -57,6 +57,8 @@ mysql> grant all privileges on *.* to 'funapi'@'localhost';
 
 mysql> create database funapi;
 
+mysql> create database funapi_leaderboard;
+
 $ sudo service mysql start
 ```
 
@@ -106,7 +108,7 @@ $ sudo vim /usr/share/funapi-authenticator/default/manifests/MANIFEST.json
 다음으로, `src/MANIFEST.json` 의 컴포넌트 설정을 해주어야 합니다. 해당 프로젝트에서는 **서버 flavor 기능**을 사용하여 `'lobby'` 서버에서 인증(authentication)이 이루어집니다. 따라서 `MANIFEST.lobby.json` 파일을 수정해야 합니다.
 
 ```bash
-$ sudo vim /game-pong-server/src/MANIFEST.lobby.json
+$ vim game-pong-server/pong-source/src/MANIFEST.lobby.json
 ```
 
 위의 명령어를 입력하여 파일을 열고, 다음과 같이 use_authenticator를 true로 변경합니다. 그리고 해당 인증 에이전트인 funapi-authenticator의 ip주소와 port번호를 각각 입력해줍니다. 여기서, `remote_authenticator_port`는 **/usr/share/funapi-authenticator/manifests/src/MANIFEST.json파일**의 `tcp_listen_port`와 같은 값이여야 합니다.
@@ -289,10 +291,48 @@ iFunEngine은 빌드 후 `-local` 스크립트와 `-launcher` 스크립트를 �
 flavor에 대한 자세한 내용은 [메뉴얼](https://www.ifunfactory.com/engine/documents/reference/ko/game-management.html#flavors)을 참고해 주세요.
 
 ## 게임 서버 실행
-테스트를 위해서, 각각의 `-local` 스크립트들을 실행시켜주세요.
+
+서버를 실행하기 전에, **분산 서비스** 설정을 위해 RPC 서비스 설정이 필요합니다. 각 서버의 설정파일은 `manifest` 디렉터리 하위에 있는 lobby, matchmaker, game 디렉터리 안에 생성됩니다.
+먼저, `ifconfig`명령 혹은 `ip link` 명령으로 네트워크 인터페이스 이름을 확인해주세요.
 
 ```bash
-$ cd pong-build/debug
+$ ifconfig
+# 또는
+$ ip link
+```
+
+네트워크 인터페이스 이름을 확인하셨으면, lobby 서버의 `MANIFEST.json` 파일을 열어주세요.
+
+```
+$ sudo vim manifest/lobby/MANIFEST.json
+```
+
+아래의 `rpc_nic_name` 내용을 `ifconfig`에서 확인한 네트워크 인터페이스 이름으로 변경해주세요.
+
+```json
+...
+"RpcService": {
+            "rpc_enabled": true,
+            "rpc_threads_size": 4,
+            "rpc_port": 6015,
+            "rpc_nic_name": "eth0",
+            "rpc_tags": [],
+            "rpc_message_logging_level": 0,
+            "enable_rpc_reply_checker": true
+          },
+...
+```
+
+완료하셨으면, game, matchmaker 서버의 `MANIFEST.json` 파일도 동일하게 수정해주세요.
+
+```bash
+$ sudo vim manifest/game/MANIFEST.json
+$ sudo vim manifest/matchmaker/MANIFEST.json
+```
+
+이제 테스트를 위해서, 각각의 `-local` 스크립트들을 실행시켜주세요.
+
+```bash
 $ ./pong.lobby-local
 $ ./pong.matchmaker-local
 $ ./pong.game-local
