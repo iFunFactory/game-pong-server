@@ -436,7 +436,7 @@ void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
         "Facebook", id, MakeFacebookAuthenticationKey(access_token));
     Authenticate(request,
                  bind(&OnFacebookAuthenticated, id, session, _1, _2, _3,
-                      kProtobufEncoding));
+                      kJsonEncoding));
   } else {
     // Guest 는 별도의 인증 없이 로그인 합니다.
     AccountManager::CheckAndSetLoggedInAsync(
