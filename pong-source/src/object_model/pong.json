@@ -2,6 +2,8 @@
   "User": {
     "Id": "String(64) KEY",
     "WinCount": "Integer",
-    "LoseCount": "Integer"
+    "LoseCount": "Integer",
+    "WinCountSingle": "Integer",
+    "LoseCountSingle": "Integer"
   }
 }

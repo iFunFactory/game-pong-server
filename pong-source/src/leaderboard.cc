@@ -14,16 +14,20 @@ static const char *kPlayerCurWinCount = "player_cur_wincount";
 // 1 일 최대 연승 기록
 static const char *kPlayerRecordWinCount = "player_record_wincount";
 
+static const char *kPlayerCurWinCountSingle = "player_cur_wincount_single";
+
+static const char *kPlayerRecordWinCountSingle = "player_record_wincount_single";
+
 static const char *kServiceProvider = "test_kServiceProvider";
 
 
 namespace pong {
 
 // 리더보드에 기록된 최대 연승을 가져옵니다.
-int GetCurrentRecordById(const string &id) {
+int GetCurrentRecordById(const string &id, bool single) {
   // 랭킹 조회 요청을 만듭니다.
   LeaderboardQueryRequest request(
-      kPlayerCurWinCount, kServiceProvider, id, kDaily,
+      single ? kPlayerCurWinCountSingle : kPlayerCurWinCount, kServiceProvider, id, kDaily,
       LeaderboardRange(LeaderboardRange::kNearby, 0, 0));
 
   // 랭킹을 조회합니다.
@@ -82,9 +86,9 @@ void OnNewRecordSubmitted(
 
 
 // 1 일 최대 연승 기록을 업데이트합니다.
-void UpdateNewRecord(const string &id, const int score) {
+void UpdateNewRecord(const string &id, const int score, bool single = false) {
   ScoreSubmissionRequest request(
-      kPlayerRecordWinCount, kServiceProvider, id, score,
+      single ? kPlayerRecordWinCountSingle : kPlayerRecordWinCount, kServiceProvider, id, score,
       ScoreSubmissionRequest::kHighScore);
   SubmitScore(request, bind(&OnNewRecordSubmitted, id, _1, _2, _3));
 }
@@ -93,7 +97,7 @@ void UpdateNewRecord(const string &id, const int score) {
 // 현재 연승 기록을 1 증가 시킨 후 불립니다.
 void OnIncreaseCurWinCountSubmitted(
     const string &id, const ScoreSubmissionRequest &request,
-    const ScoreSubmissionResponse &response, const bool &error) {
+    const ScoreSubmissionResponse &response, const bool &error, bool single) {
   if (error) {
     LOG(ERROR) << "Failed to update score. Leaderboard system error: id=" << id;
     return;
@@ -116,16 +120,16 @@ void OnIncreaseCurWinCountSubmitted(
 
   // 1 일 최대 연승 기록을 업데이트합니다.
   // TODO: 1 일 최대 연승 값을 ORM 에 기록하고 갱신이 확실할 때만 호출한다.
-  UpdateNewRecord(request.player_account.id(), response.new_score);
+  UpdateNewRecord(request.player_account.id(), response.new_score, single);
 }
 
 
 // 현재 연승 기록을 1 증가 시킵니다.
-void IncreaseCurWinCount(const string &id) {
+void IncreaseCurWinCount(const string &id, bool single) {
   ScoreSubmissionRequest request(
-      kPlayerCurWinCount, kServiceProvider, id, 1,
+      single ? kPlayerCurWinCountSingle : kPlayerCurWinCount, kServiceProvider, id, 1,
       ScoreSubmissionRequest::kIncrement);
-  SubmitScore(request, bind(&OnIncreaseCurWinCountSubmitted, id, _1, _2, _3));
+  SubmitScore(request, bind(&OnIncreaseCurWinCountSubmitted, id, _1, _2, _3, single));
 }
 
 
@@ -142,9 +146,9 @@ void OnResetCurWinCountSubmitted(
 
 
 // 현재 연승 기록을 0 으로 초기화 합니다.
-void ResetCurWinCount(const string &id) {
+void ResetCurWinCount(const string &id, bool single) {
   ScoreSubmissionRequest request(
-      kPlayerCurWinCount, kServiceProvider, id, 0,
+      single ? kPlayerCurWinCountSingle : kPlayerCurWinCount, kServiceProvider, id, 0,
       ScoreSubmissionRequest::kOverwriting);
   SubmitScore(request, bind(&OnResetCurWinCountSubmitted, id, _1, _2, _3));
 }
@@ -188,9 +192,9 @@ void OnGetTopEightList(
 
 // 1 일 최대 연승 기록 TOP 8 을 세션으로 전송합니다.
 void GetAndSendTopEightList(const Ptr<Session> session,
-                            EncodingScheme encoding) {
+                            EncodingScheme encoding, bool single) {
   LeaderboardQueryRequest request(
-    kPlayerRecordWinCount, kDaily,
+    single ? kPlayerRecordWinCountSingle : kPlayerRecordWinCount, kDaily,
     LeaderboardRange(LeaderboardRange::kFromTop, 0, 7),
     LeaderboardQueryRequest::kStdCompetition);
   GetLeaderboard(

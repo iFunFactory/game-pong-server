@@ -175,6 +175,9 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success,
     response["winCount"] = user->GetWinCount();
     response["loseCount"] = user->GetLoseCount();
     response["curRecord"] = GetCurrentRecordById(id);
+    response["singleWinCount"] = user->GetWinCountSingle();
+    response["singleLoseCount"] = user->GetLoseCountSingle();
+    response["singleCurRecord"] = GetCurrentRecordById(id, true);
 
     session->SendMessage("login", response, kDefaultEncryption);
   } else {
@@ -185,6 +188,9 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success,
     login_response->set_win_count(user->GetWinCount());
     login_response->set_lose_count(user->GetLoseCount());
     login_response->set_cur_record(GetCurrentRecordById(id));
+    login_response->set_win_count_single(user->GetWinCountSingle());
+    login_response->set_lose_count_single(user->GetLoseCountSingle());
+    login_response->set_cur_record_single(GetCurrentRecordById(id, true));
 
     session->SendMessage("login", response, kDefaultEncryption);
   }
@@ -417,6 +423,35 @@ void CancelMatchmaking(const Ptr<Session>& session, EncodingScheme encoding) {
   MatchmakingClient::CancelMatchmaking(kMatch1vs1, id, cancel_cb);
 }
 
+void HandleSingleModeResult(const Ptr<Session>& session, bool win)
+{
+  string id;
+  if (not session->GetFromContext("id", &id)) {
+    LOG(WARNING) << "Failed to update singlemode game result. Not logged in.";
+    session->SendMessage("error", MakeResponse("fail", "not logged in"));
+    return;
+  }
+
+  Ptr<User> user = User::FetchById(id);
+
+  if(not user)
+  {
+    LOG(ERROR) << "Cannot find user's id in db: id=" << id;
+    return;
+  }
+
+  if(win)
+  {
+    user->SetWinCountSingle(user->GetWinCountSingle()+1);
+    IncreaseCurWinCount(id, true);
+  }
+  else
+  {
+    user->SetLoseCountSingle(user->GetLoseCountSingle()+1);
+    ResetCurWinCount(id, true);
+  }
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -457,12 +492,23 @@ void OnCancelMatchmaking(const Ptr<Session> &session, const Json &/*message*/) {
   CancelMatchmaking(session, kJsonEncoding);
 }
 
+void OnSingleModeResultReceived(const Ptr<Session> &session, const Json &message) {
+  bool win = false;
+
+  string str = message["result"].GetString();
+  win = ( str == "win");
+
+  HandleSingleModeResult(session, win);
+}
 
 // TOP 8 랭킹 메시지를 받으면 불립니다.
 void OnRanklistRequested(const Ptr<Session> &session, const Json &message) {
   GetAndSendTopEightList(session, kJsonEncoding);
 }
 
+void OnSingleRanklistRequested(const Ptr<Session> &session, const Json &message) {
+  GetAndSendTopEightList(session, kJsonEncoding, true);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -499,22 +545,35 @@ void OnAccountLogin2(
   }
 }
 
+void OnSingleModeResultReceived2(
+  const Ptr<Session> &session, const Ptr<FunMessage> &message) {
+
+  bool win = false;
+
+  const LobbySingleModeResultMessage &msg = message->GetExtension(lobby_single_result);
+  win = (msg.result() == "win");
+
+  HandleSingleModeResult(session, win);
+}
 
 void OnMatchmaking2(
     const Ptr<Session> &session, const Ptr<FunMessage> &/*message*/) {
   StartMatchmaking(session, kProtobufEncoding);
 }
 
-
 void OnCancelMatchmaking2(
     const Ptr<Session> &session, const Ptr<FunMessage> &/*message*/) {
   CancelMatchmaking(session, kProtobufEncoding);
 }
 
-
 void OnRankListRequested2(
     const Ptr<Session> &session, const Ptr<FunMessage> &message) {
   GetAndSendTopEightList(session, kProtobufEncoding);
+}
+
+void OnSingleRankListRequested2(
+    const Ptr<Session> &session, const Ptr<FunMessage> &message) {
+  GetAndSendTopEightList(session, kProtobufEncoding, true);
 }
 
 
@@ -546,15 +605,22 @@ void RegisterLobbyEventHandlers() {
                          JsonSchema("id", JsonSchema::kString, true));
     HandlerRegistry::Register("login", OnAccountLogin, login_msg);
 
+    // JSON 버전 Result 핸들러
+    HandlerRegistry::Register("singleresult", OnSingleModeResultReceived);
+
     // JSON 버전 Matchmaking 핸들러
     HandlerRegistry::Register("match", OnMatchmaking);
     HandlerRegistry::Register("cancelmatch", OnCancelMatchmaking);
 
     // JSON 버전 Leaderboard 핸들러
     HandlerRegistry::Register("ranklist", OnRanklistRequested);
+    HandlerRegistry::Register("ranklist_single", OnSingleRanklistRequested);
   } else {
     // Protobuf 버전 Login 핸들러
     HandlerRegistry::Register2("login", OnAccountLogin2);
+
+    // Protobuf 버전 Result 핸들러
+    HandlerRegistry::Register2("singleresult", OnSingleModeResultReceived2);
 
     // Protobuf 버전 Matchmkaing 핸들러
     HandlerRegistry::Register2("match", OnMatchmaking2);
@@ -562,6 +628,7 @@ void RegisterLobbyEventHandlers() {
 
     // Protobuf 버전 Leaderboard 핸들러
     HandlerRegistry::Register2("ranklist", OnRankListRequested2);
+    HandlerRegistry::Register2("ranklist_single", OnSingleRankListRequested2);
   }
 }
 

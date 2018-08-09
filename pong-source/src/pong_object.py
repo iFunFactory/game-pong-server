@@ -73,6 +73,10 @@ attribute = funapi.AttributeModel('WinCount', 'Integer', False, False, False, Fa
 object.add_attribute_model(attribute)
 attribute = funapi.AttributeModel('LoseCount', 'Integer', False, False, False, False, False, '')
 object.add_attribute_model(attribute)
+attribute = funapi.AttributeModel('WinCountSingle', 'Integer', False, False, False, False, False, '')
+object.add_attribute_model(attribute)
+attribute = funapi.AttributeModel('LoseCountSingle', 'Integer', False, False, False, False, False, '')
+object.add_attribute_model(attribute)
 attribute = funapi.AttributeModel('_tag', 'String', False, False, False, False, False, '')
 object.add_attribute_model(attribute)
 funapi.ObjectModel.add_object_model(object)
@@ -136,6 +140,18 @@ class User:
 
   def set_LoseCount(self, value):
     self.object_.set_attribute('LoseCount', value)
+
+  def get_WinCountSingle(self):
+    return self.object_.get_attribute('WinCountSingle')
+
+  def set_WinCountSingle(self, value):
+    self.object_.set_attribute('WinCountSingle', value)
+
+  def get_LoseCountSingle(self):
+    return self.object_.get_attribute('LoseCountSingle')
+
+  def set_LoseCountSingle(self, value):
+    self.object_.set_attribute('LoseCountSingle', value)
 
   def get__tag(self):
     return self.object_.get_attribute('_tag')

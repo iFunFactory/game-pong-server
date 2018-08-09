@@ -6,11 +6,11 @@
 
 namespace pong {
 
-int GetCurrentRecordById(const string &id);
-void IncreaseCurWinCount(const string &id);
-void ResetCurWinCount(const string &id);
+int GetCurrentRecordById(const string &id, bool single = false);
+void IncreaseCurWinCount(const string &id, bool single = false);
+void ResetCurWinCount(const string &id, bool single = false);
 void GetAndSendTopEightList(
-    const Ptr<Session> session, EncodingScheme encoding);
+    const Ptr<Session> session, EncodingScheme encoding, bool single = false);
 
 }  // namespace pong
 

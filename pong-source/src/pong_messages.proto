@@ -25,6 +25,9 @@ message LobbyLoginReply {
   optional int32 win_count = 4;
   optional int32 lose_count = 5;
   optional int32 cur_record = 6;
+  optional int32 win_count_single = 7;
+  optional int32 lose_count_single = 8;
+  optional int32 cur_record_single = 9;
 }
 
 
@@ -59,6 +62,12 @@ message LobbyRankListReply {
   required string result = 1;
   optional string msg = 2;
   repeated RankElement rank = 3;
+}
+
+
+message LobbySingleModeResultMessage {
+  required string result = 1;
+  optional string msg = 2;
 }
 
 
@@ -100,6 +109,8 @@ extend FunMessage {
 
   optional LobbyRankListRequest lobby_rank_list_req = 25;
   optional LobbyRankListReply lobby_rank_list_repl = 26;
+
+  optional LobbySingleModeResultMessage lobby_single_result = 27;
 
   optional GameStartMessage game_start = 30;
   optional GameResultMessage game_result = 31;
