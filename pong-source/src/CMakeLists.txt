@@ -8,6 +8,8 @@
 # NOTE: IF YOU HAVE MORE SOURCE FILES, ADD HERE.
 set(
   ADDITIONAL_CPP_SOURCES
+  api_handlers.cc
+  api_handlers.h
   common_handlers.cc
   common_handlers.h
   game_event_handlers.cc
@@ -55,3 +57,8 @@ include(Funapi-src)
 #
 # E.g., set_target_properties(${PROJECT_NAME} ...)
 ###############################################################################
+
+# ORM 없는 빌드 지원을 위한 플래그
+set_property(TARGET ${PROJECT_NAME} APPEND_STRING
+             PROPERTY COMPILE_FLAGS
+             " -DPONG_ENABLE_ORM=0")

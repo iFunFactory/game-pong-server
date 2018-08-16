@@ -15,6 +15,7 @@ message LobbyLoginRequest {
   required string id = 1;
   required string type = 2;  // "fb" 외에는 모두 게스트 인증으로 처리
   optional string access_token = 3;  // "fb" 일 경우 클라이언트로부터 받는 토큰 값
+  optional string token = 4;  // 싱글플레이 / 멀티플레이 연동 용 토큰
 }
 
 

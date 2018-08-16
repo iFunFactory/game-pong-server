@@ -1,4 +1,4 @@
-﻿#include "lobby_event_handlers.h"
+#include "lobby_event_handlers.h"
 
 #include <funapi.h>
 #include <glog/logging.h>
@@ -96,8 +96,6 @@ void FreeUser(const Ptr<Session> &session, EncodingScheme encoding) {
   }
 }
 
-}  // unnamed namespace
-
 
 // AccountManager 의 로그인 처리가 끝나면 불립니다.
 void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success,
@@ -152,6 +150,7 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success,
     return;
   }
 
+#if PONG_ENABLE_ORM
   // User Object 를 가져옵니다.
   Ptr<User> user = User::FetchById(id);
 
@@ -160,6 +159,8 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success,
     user = User::Create(id);
     LOG(INFO) << "Registered new user: id=" << id;
   }
+#endif
+
   LOG(INFO) << "Succeed to login: id=" << id;
 
   // 로그인 Activitiy Log 를 남깁니다.
@@ -172,12 +173,21 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success,
   if (encoding == kJsonEncoding) {
     Json response = MakeResponse("ok");
     response["id"] = id;
+#if PONG_ENABLE_ORM
     response["winCount"] = user->GetWinCount();
     response["loseCount"] = user->GetLoseCount();
     response["curRecord"] = GetCurrentRecordById(id);
     response["singleWinCount"] = user->GetWinCountSingle();
     response["singleLoseCount"] = user->GetLoseCountSingle();
     response["singleCurRecord"] = GetCurrentRecordById(id, true);
+#else
+    response["winCount"] = 0;
+    response["loseCount"] = 0;
+    response["curRecord"] = 0;
+    response["singleWinCount"] = 0;
+    response["singleLoseCount"] = 0;
+    response["singleCurRecord"] = 0;
+#endif
 
     session->SendMessage("login", response, kDefaultEncryption);
   } else {
@@ -185,12 +195,22 @@ void OnLoggedIn(const string &id, const Ptr<Session> &session, bool success,
     LobbyLoginReply *login_response = response->MutableExtension(lobby_login_repl);
     login_response->set_result("ok");
     login_response->set_id(id);
+
+#if PONG_ENABLE_ORM
     login_response->set_win_count(user->GetWinCount());
     login_response->set_lose_count(user->GetLoseCount());
     login_response->set_cur_record(GetCurrentRecordById(id));
     login_response->set_win_count_single(user->GetWinCountSingle());
     login_response->set_lose_count_single(user->GetLoseCountSingle());
     login_response->set_cur_record_single(GetCurrentRecordById(id, true));
+#else
+    login_response->set_win_count(0);
+    login_response->set_lose_count(0);
+    login_response->set_cur_record(0);
+    login_response->set_win_count_single(0);
+    login_response->set_lose_count_single(0);
+    login_response->set_cur_record_single(0);
+#endif
 
     session->SendMessage("login", response, kDefaultEncryption);
   }
@@ -250,6 +270,58 @@ void OnFacebookAuthenticated(
   // 이어서 로그인 처리를 진행합니다.
   AccountManager::CheckAndSetLoggedInAsync(
       fb_uid, session, bind(&OnLoggedIn, _1, _2, _3, encoding));
+}
+
+
+void OnLoginFromSinglePlayServer(const Ptr<Session> &session,
+                                 const std::string &token,
+                                 EncodingScheme encoding) {
+  DLOG(INFO) << "OnLoginFromSinglePlayServer(token=" << token << ")";
+  // 유효한 토큰이 있다면, redis에 해당 키로 유저 데이터를 가지고 있다.
+  // 해당 데이터를 가져온다.
+  fun::Redis::GetAsync(token,
+    [session, token, encoding](const Redis::Result &result,
+        const std::string &value) {
+      if (result != Redis::kResultSuccess) {
+        LOG(WARNING) << "Failed to get user data for token: " << token;
+        if (encoding == kJsonEncoding) {
+          session->SendMessage("login",
+                               MakeResponse("nop", "Missing token"),
+                               kDefaultEncryption);
+        } else {
+          Ptr<FunMessage> response(new FunMessage);
+          auto *login_response = response->MutableExtension(lobby_login_repl);
+          login_response->set_result("nop");
+          login_response->set_msg("Missing token");
+          session->SendMessage("login", response, kDefaultEncryption);
+        }
+        return;
+      }
+
+      fun::Json user_data;
+      if (not user_data.FromString(value) ||
+          not user_data.IsObject() ||
+          not user_data.HasAttribute("uid", Json::kString)) {
+        LOG(WARNING) << "user data for token: " << token
+                     << " does not have valid uid";
+        if (encoding == kJsonEncoding) {
+          session->SendMessage("login",
+                               MakeResponse("nop", "Invalid user data"),
+                               kDefaultEncryption);
+        } else {
+          Ptr<FunMessage> response(new FunMessage);
+          auto *login_response = response->MutableExtension(lobby_login_repl);
+          login_response->set_result("nop");
+          login_response->set_msg("Invalid user data");
+          session->SendMessage("login", response, kDefaultEncryption);
+        }
+        return;
+      }
+
+      std::string uid = user_data["uid"].GetString();
+      AccountManager::CheckAndSetLoggedInAsync(uid, session,
+          bind(&OnLoggedIn, _1, _2, _3, encoding));
+  });
 }
 
 
@@ -423,6 +495,7 @@ void CancelMatchmaking(const Ptr<Session>& session, EncodingScheme encoding) {
   MatchmakingClient::CancelMatchmaking(kMatch1vs1, id, cancel_cb);
 }
 
+
 void HandleSingleModeResult(const Ptr<Session>& session, bool win)
 {
   string id;
@@ -473,9 +546,20 @@ void OnAccountLogin(const Ptr<Session> &session, const Json &message) {
                  bind(&OnFacebookAuthenticated, id, session, _1, _2, _3,
                       kJsonEncoding));
   } else {
+#if PONG_ENABLE_ORM
     // Guest 는 별도의 인증 없이 로그인 합니다.
     AccountManager::CheckAndSetLoggedInAsync(
         id, session, bind(&OnLoggedIn, _1, _2, _3, kJsonEncoding));
+#else
+    if (not message.HasAttribute("token", fun::Json::kString)) {
+      session->SendMessage("login", MakeResponse("nop", "Token is requied"),
+                           kDefaultEncryption);
+      return;
+    }
+
+    std::string token = message["token"].GetString();
+    OnLoginFromSinglePlayServer(session, token, kJsonEncoding);
+#endif
   }
 }
 
@@ -539,9 +623,23 @@ void OnAccountLogin2(
                  bind(&OnFacebookAuthenticated, id, session, _1, _2, _3,
                       kProtobufEncoding));
   } else {
+#if PONG_ENABLE_ORM
     // Guest 는 별도의 인증 없이 로그인 합니다.
     AccountManager::CheckAndSetLoggedInAsync(
         id, session, bind(&OnLoggedIn, _1, _2, _3, kProtobufEncoding));
+#else
+    std::string token;
+    if (not req.has_token()) {
+      Ptr<FunMessage> response(new FunMessage);
+      auto *login_response = response->MutableExtension(lobby_login_repl);
+      login_response->set_result("nop");
+      login_response->set_msg("Missing token");
+      session->SendMessage("login", response, kDefaultEncryption);
+      return;
+    }
+
+    OnLoginFromSinglePlayServer(session, req.token(), kProtobufEncoding);
+#endif
   }
 }
 
@@ -575,6 +673,7 @@ void OnSingleRankListRequested2(
     const Ptr<Session> &session, const Ptr<FunMessage> &message) {
   GetAndSendTopEightList(session, kProtobufEncoding, true);
 }
+}  // unnamed namespace
 
 
 // 로비 서버 핸들러들을 등록합니다.

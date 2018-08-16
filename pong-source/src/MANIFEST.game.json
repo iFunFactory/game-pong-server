@@ -60,7 +60,7 @@
           "Object": {
             "cache_expiration_in_ms" : 3000,
             "copy_cache_expiration_in_ms": 700,
-            "enable_database" : true,
+            "enable_database" : false,
             "db_mysql_server_address" : "tcp://127.0.0.1:3306",
             "db_mysql_id" : "funapi",
             "db_mysql_pw" : "funapi",
@@ -118,7 +118,7 @@
             "rpc_enabled": true,
             "rpc_threads_size": 4,
             "rpc_port": 7015,
-            "rpc_nic_name": "eth0",
+            "rpc_nic_name": "",
             "rpc_tags": [],
             "rpc_message_logging_level": 0,
             "enable_rpc_reply_checker": true
@@ -127,7 +127,7 @@
             "zookeeper_nodes": "localhost:2181"
           },
           "HardwareInfo": {
-            "external_ip_resolvers": "aws,nic:eth0,nat:93.184.216.34:tcp+pbuf=8012:http+json=8018"
+            "external_ip_resolvers": "aws,nic:eno1"
           },
           "Curl": {
             "curl_threads_size": 1

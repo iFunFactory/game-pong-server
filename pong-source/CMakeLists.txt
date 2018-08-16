@@ -78,7 +78,6 @@ set(WANT_CXX11 true)
 # Shows compiler warnings?
 set(WANT_COMPILER_WARNING true)
 
-
 set(CMAKE_MODULE_PATH "/usr/share/funapi/cmake")
 include(Funapi)
 

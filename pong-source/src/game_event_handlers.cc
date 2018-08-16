@@ -27,6 +27,7 @@ namespace pong {
 // Player 들의 승/패를 1 증가 시킵니다.
 void FetchAndUpdateMatchRecord(const string& winner_id,
                                const string& loser_id) {
+#if PONG_ENABLE_ORM
   Ptr<User> winner = User::FetchById(winner_id);
   Ptr<User> loser = User::FetchById(loser_id);
 
@@ -42,6 +43,7 @@ void FetchAndUpdateMatchRecord(const string& winner_id,
 
   winner->SetWinCount(winner->GetWinCount() + 1);
   loser->SetLoseCount(loser->GetLoseCount() + 1);
+#endif
 }
 
 
