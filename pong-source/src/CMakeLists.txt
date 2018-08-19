@@ -14,6 +14,8 @@ set(
   common_handlers.h
   game_event_handlers.cc
   game_event_handlers.h
+  game_session.cc
+  game_session.h
   lobby_event_handlers.cc
   lobby_event_handlers.h
   leaderboard.cc

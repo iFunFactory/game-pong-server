@@ -10,6 +10,8 @@ namespace pong {
 
 void RegisterGameEventHandlers();
 
+void TerminateGame(const fun::Uuid &game_id);
+
 }  // namespace pong
 
 #endif  // SRC_GAME_EVENT_HANDLERS_H_

@@ -108,3 +108,46 @@ def handle_multi_play():
         print(traceback.format_exc())
 
     return json.dumps(result)
+
+
+def get_ranks(single):
+    url = 'http://localhost:6014/v1/ranking/'
+    if single:
+        url += 'single/'
+    else:
+        url += 'multi/'
+
+    try:
+        req = requests.get(url)
+        req.raise_for_status()
+        result = json.loads(req.content)
+        return json.dumps(result)
+    except:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify(error_code=1001)
+
+
+@app.route('/v1/ranking/single/', methods=['GET'])
+@token_required
+def handle_single_ranking():
+    return get_ranks(True)
+
+
+@app.route('/v1/ranking/multi/', methods=['GET'])
+@token_required
+def handle_multi_ranking():
+    return get_ranks(False)
+
+
+@app.route('/v1/match/single', strict_slashes=False, methods=['POST'])
+@token_required
+def handle_single_match_finished():
+    return jsonify(error_code=0)
+
+
+@app.route('/v1/match/result', strict_slashes=False, methods=['POST'])
+def handle_match_result():
+    # TODO(jinuk): 여기서 매치 결과를 처리한다.
+    return jsonify(error_code=0)
+

@@ -10,7 +10,9 @@
 
 namespace pong {
 
-void MoveServerByTag(const Ptr<Session> session, const string &tag);
+void MoveServerByTag(const Ptr<Session> session,
+                     const string &tag,
+                     const fun::Json &extra_data);
 void RegisterCommonHandlers();
 
 }  // namespace pong

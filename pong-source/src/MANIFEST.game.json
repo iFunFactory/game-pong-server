@@ -4,8 +4,8 @@
     {
       "name": "PongServer",
       "arguments": {
-        "example_arg1": "val1",
-        "example_arg2": 100
+        // 게임 종료 후 결과를 받을 URL
+        "pong_game_result_url": "http://10.10.1.7:9000/v1/match/result"
       },
       "dependency": {
           "AppInfo": {

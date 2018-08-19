@@ -28,6 +28,29 @@ namespace {
 void FreeUser(const Ptr<Session> &session, EncodingScheme encoding);
 
 
+// 클라이언트가 다른 서버에서 이동해 왔을 때 불립니다.
+void OnClientRedirected(
+    const std::string &account_id, const Ptr<Session> &session, bool success,
+    const std::string &extra_data) {
+  if (not success) {
+    LOG(WARNING) << "Client redirection failed. Blocked by the engine: id="
+                 << account_id;
+    session->Close();
+    return;
+  }
+
+  // 이전 서버의 Session Context 를 적용합니다.
+  Json context;
+  context.FromString(extra_data);
+  if (context.HasAttribute("context", fun::Json::kObject)) {
+    boost::mutex::scoped_lock lock(*session);
+    session->SetContext(context["context"]);
+  }
+
+  LOG(INFO) << "Client redirected: id=" << account_id;
+}
+
+
 // 새 클라이언트가 접속하여 세션이 열릴 때 불리는 함수
 void OnSessionOpened(const Ptr<Session> &session) {
   // 세션 접속  Activity Log 를 남깁니다.
@@ -298,6 +321,9 @@ void OnLoginFromSinglePlayServer(const Ptr<Session> &session,
         return;
       }
 
+      // Redis 에서 토큰을 지운다.
+      fun::Redis::DelAsync(token, [](const Redis::Result&, const size_t&) {});
+
       fun::Json user_data;
       if (not user_data.FromString(value) ||
           not user_data.IsObject() ||
@@ -359,11 +385,20 @@ void StartMatchmaking(const Ptr<Session> &session, EncodingScheme encoding) {
       // Matchmaking 에 성공했습니다.
       LOG(INFO) << "Succeed in matchmaking: id=" << player_id;
 
+      fun::Json game_ctxt;
+      game_ctxt.SetObject();
+      game_ctxt.AddAttribute(
+          "game_id", boost::lexical_cast<std::string>(match.match_id));
+
       BOOST_ASSERT(HasJsonStringAttribute(match.context, "A"));
       BOOST_ASSERT(HasJsonStringAttribute(match.context, "B"));
 
       const string player_a_id = match.context["A"].GetString();
       const string player_b_id = match.context["B"].GetString();
+
+      game_ctxt["users"].SetArray();
+      game_ctxt["users"].PushBack(player_a_id);
+      game_ctxt["users"].PushBack(player_b_id);
 
       string opponent_id = match.context["A"].GetString();
       if (opponent_id == player_id) {
@@ -386,10 +421,9 @@ void StartMatchmaking(const Ptr<Session> &session, EncodingScheme encoding) {
         session->AddToContext("opponent", player_a_id);
       }
       session->AddToContext("matching", "done");
-      session->AddToContext("ready", 0);
 
       // 유저를 Game 서버로 보냅니다.
-      MoveServerByTag(session, "game");
+      MoveServerByTag(session, "game", game_ctxt);
       FreeUser(session, encoding);
     } else if (result == MatchmakingClient::kMRAlreadyRequested) {
       // Matchmaking 요청을 중복으로 보냈습니다.
@@ -697,6 +731,8 @@ void RegisterLobbyEventHandlers() {
       OnSessionOpened, bind(&OnSessionClosed, _1, _2, encoding));
   HandlerRegistry::RegisterTcpTransportDetachedHandler(
       bind(&OnTransportTcpDetached, _1, encoding));
+
+  AccountManager::RegisterRedirectionHandler(OnClientRedirected);
 
   if (encoding == kJsonEncoding) {
     // JSON 버전 Login 핸들러

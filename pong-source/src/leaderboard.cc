@@ -193,12 +193,22 @@ void OnGetTopEightList(
 // 1 일 최대 연승 기록 TOP 8 을 세션으로 전송합니다.
 void GetAndSendTopEightList(const Ptr<Session> session,
                             EncodingScheme encoding, bool single) {
+  GetTopEightList(single, [session, encoding](
+        const LeaderboardQueryRequest &request,
+        const LeaderboardQueryResponse &response,
+        const bool &error) {
+      OnGetTopEightList(session, request, response, error, encoding);
+    });
+}
+
+
+void GetTopEightList(bool single, const TopEightListCallback &callback) {
+  DLOG(INFO) << "GetTopEightList(single=" << int(single) << ")";
   LeaderboardQueryRequest request(
-    single ? kPlayerRecordWinCountSingle : kPlayerRecordWinCount, kDaily,
-    LeaderboardRange(LeaderboardRange::kFromTop, 0, 7),
-    LeaderboardQueryRequest::kStdCompetition);
-  GetLeaderboard(
-      request, bind(&OnGetTopEightList, session, _1, _2, _3, encoding));
+      single ? kPlayerRecordWinCountSingle : kPlayerRecordWinCount, kDaily,
+      LeaderboardRange(LeaderboardRange::kFromTop, 0, 7),
+      LeaderboardQueryRequest::kStdCompetition);
+  GetLeaderboard(request, bind(callback, _1, _2, _3));
 }
 
 } // namespace pong
