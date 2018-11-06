@@ -17,9 +17,11 @@ DECLARE_string(app_flavor);
 DECLARE_uint64(tcp_json_port);
 DECLARE_uint64(udp_json_port);
 DECLARE_uint64(http_json_port);
+DECLARE_uint64(websocket_json_port);
 DECLARE_uint64(tcp_protobuf_port);
 DECLARE_uint64(udp_protobuf_port);
 DECLARE_uint64(http_protobuf_port);
+DECLARE_uint64(websocket_protobuf_port);
 
 
 namespace pong {
@@ -63,7 +65,7 @@ void OnSessionClosed(const Ptr<Session> &session, SessionCloseReason reason,
                      EncodingScheme encoding) {
   // 세션 닫힘 Activity Log 를 남깁니다.
   logger::SessionClosed(to_string(session->id()), WallClock::Now());
-  // 세션을 초기과 합니다.
+  // 세션을 초기화 합니다.
   FreeUser(session, encoding);
 }
 
@@ -74,7 +76,18 @@ void OnTransportTcpDetached(const Ptr<Session> &session,
   string id;
   session->GetFromContext("id", &id);
   LOG_IF(INFO, not id.empty()) << "TCP disconnected: id=" << id;
-  // 세션을 초기과 합니다.
+  // 세션을 초기화 합니다.
+  FreeUser(session, encoding);
+}
+
+
+// Websocket 연결이 끊기면 불립니다.
+void OnTransportWebsocketDetached(const Ptr<Session> &session,
+                            EncodingScheme encoding) {
+  string id;
+  session->GetFromContext("id", &id);
+  LOG_IF(INFO, not id.empty()) << "Websocket disconnected: id=" << id;
+  // 세션을 초기화 합니다.
   FreeUser(session, encoding);
 }
 
@@ -297,10 +310,10 @@ void OnResultRequested2(
 // 게임 서버 핸들러들을 등록합니다.
 void RegisterGameEventHandlers() {
   EncodingScheme encoding = kUnknownEncoding;
-  if (FLAGS_tcp_json_port || FLAGS_udp_json_port || FLAGS_http_json_port) {
+  if (FLAGS_tcp_json_port || FLAGS_udp_json_port || FLAGS_http_json_port || FLAGS_websocket_json_port) {
     encoding = kJsonEncoding;
   }
-  if (FLAGS_tcp_protobuf_port || FLAGS_udp_protobuf_port || FLAGS_http_protobuf_port) {
+  if (FLAGS_tcp_protobuf_port || FLAGS_udp_protobuf_port || FLAGS_http_protobuf_port || FLAGS_websocket_protobuf_port) {
     if (encoding != kUnknownEncoding) {
       LOG(FATAL) << "Cannot set both JSON and Protobuf. "
                  << "Enable only one in MANIFEST.lobby.json";
@@ -315,6 +328,8 @@ void RegisterGameEventHandlers() {
       OnSessionOpened, bind(&OnSessionClosed, _1, _2, encoding));
   HandlerRegistry::RegisterTcpTransportDetachedHandler(
       bind(&OnTransportTcpDetached, _1, encoding));
+  HandlerRegistry::RegisterWebSocketTransportDetachedHandler(
+      bind(&OnTransportWebsocketDetached, _1, encoding));
 
   if (encoding == kJsonEncoding) {
     // JSON 인 경우 메시지 핸들러.
