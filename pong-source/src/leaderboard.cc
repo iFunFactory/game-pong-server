@@ -27,7 +27,7 @@ namespace pong {
 int GetCurrentRecordById(const string &id, bool single) {
   // 랭킹 조회 요청을 만듭니다.
   LeaderboardQueryRequest request(
-      single ? kPlayerCurWinCountSingle : kPlayerCurWinCount, kServiceProvider, id, kDaily,
+      single ? kPlayerCurWinCountSingle : kPlayerCurWinCount, kServiceProvider, id, kAllTime,
       LeaderboardRange(LeaderboardRange::kNearby, 0, 0));
 
   // 랭킹을 조회합니다.
@@ -158,11 +158,13 @@ void ResetCurWinCount(const string &id, bool single) {
 void OnGetTopEightList(
     const Ptr<Session> session, const LeaderboardQueryRequest &request,
     const LeaderboardQueryResponse &response, const bool &error,
-    EncodingScheme encoding) {
+    EncodingScheme encoding, bool single) {
   if (error) {
     LOG(ERROR) << "Failed to query top 8. Leaderboard system error.";
     return;
   }
+
+  const string msgtype = single ? "ranklist_single" : "ranklist";
 
   if (encoding == kJsonEncoding) {
     Json msg;
@@ -173,7 +175,7 @@ void OnGetTopEightList(
       msg["ranks"][index]["id"] = response.records[i].player_account.id();
     }
 
-    session->SendMessage("ranklist", msg, kDefaultEncryption);
+    session->SendMessage(msgtype, msg, kDefaultEncryption);
   } else {
     Ptr<FunMessage> msg(new FunMessage);
     LobbyRankListReply *rank_response
@@ -185,7 +187,7 @@ void OnGetTopEightList(
       elem->set_score(response.records[i].score);
       elem->set_id(response.records[i].player_account.id());
     }
-    session->SendMessage("ranklist", msg, kDefaultEncryption);
+    session->SendMessage(msgtype, msg, kDefaultEncryption);
   }
 }
 
@@ -194,11 +196,11 @@ void OnGetTopEightList(
 void GetAndSendTopEightList(const Ptr<Session> session,
                             EncodingScheme encoding, bool single) {
   LeaderboardQueryRequest request(
-    single ? kPlayerRecordWinCountSingle : kPlayerRecordWinCount, kDaily,
+    single ? kPlayerRecordWinCountSingle : kPlayerRecordWinCount, kAllTime,
     LeaderboardRange(LeaderboardRange::kFromTop, 0, 7),
     LeaderboardQueryRequest::kStdCompetition);
   GetLeaderboard(
-      request, bind(&OnGetTopEightList, session, _1, _2, _3, encoding));
+      request, bind(&OnGetTopEightList, session, _1, _2, _3, encoding, single));
 }
 
 } // namespace pong
