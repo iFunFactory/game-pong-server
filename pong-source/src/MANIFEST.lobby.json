@@ -92,11 +92,6 @@
             "api_service_event_tags_size": 1,
             "api_service_logging_level": 2
           },
-          "AuthenticationClient": {
-            "use_authenticator" : true,
-            "remote_authenticator_ip_address" : "127.0.0.1",
-            "remote_authenticator_port" : 12800
-          },
           "LeaderboardClient": {
             "use_leaderboard" : true,
             "leaderboard_agents": {

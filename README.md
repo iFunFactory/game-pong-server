@@ -17,8 +17,6 @@
     - [mysql 설치](#mysql-설치)
     - [mysql 설치 후 환경설정](#mysql-설치-후-환경설정)
     - [zookeeper 설치](#zookeeper-설치)
-    - [funapi-authenticator 설치](#funapi-authenticator-설치)
-    - [funapi-authenticator 설치 후 환경설정](#funapi-authenticator-설치-후-환경설정)
     - [funapi-leaderboard 설치](#funapi-leaderboard-설치)
     - [funapi-leaderboard 설치 후 환경설정](#funapi-leaderboard-설치-후-환경설정)
 * [프로젝트 디렉터리 구조](#프로젝트-디렉터리-구조)
@@ -67,66 +65,6 @@ $ sudo service mysql start
 ```bash
 $ sudo apt-get install zookeeper zookeeperd
 $ sudo service zookeeper start
-```
-
-#### funapi-authenticator 설치
-
-authenticator는 agent구조로 되어있습니다. 아래의 명령어를 이용해 설치합니다.
-
-```bash
-$ sudo apt-get update
-$ sudo apt-get install funapi-authenticator1
-```
-
-#### funapi-authenticator 설치 후 환경설정
-
-설치가 완료되었다면 authenticator를 사용하기 위해 환경설정이 필요합니다. 먼저 `/etc/default/funapi-authenticator` 파일을 열고, `enabled = 1` 로 설정합니다. 
-
-```bash
-$ sudo vim /etc/default/funapi-authenticator
-```
-
-이후, 아래의 명령어를 입력하여 MANIFEST.json 파일을 열어주세요.
-
-```bash
-$ sudo vim /usr/share/funapi-authenticator/default/manifests/MANIFEST.json
-```
-
-`tcp_listen_port` 는 authenticator 클라이언트가 인증 에이전트로 접속하기 위한 port number입니다.
-
-```json
-...
-"arguments": {
-  "tcp_listen_port" : 12800,
-  "http_listen_port" : 12801,
-  "bypass" : false,
-  "ip_address_table_path" : "acl/ip_address_table"
-},
-...
-```
-
-다음으로, `src/MANIFEST.json` 의 컴포넌트 설정을 해주어야 합니다. 해당 프로젝트에서는 **서버 flavor 기능**을 사용하여 `'lobby'` 서버에서 인증(authentication)이 이루어집니다. 따라서 `MANIFEST.lobby.json` 파일을 수정해야 합니다.
-
-```bash
-$ vim game-pong-server/pong-source/src/MANIFEST.lobby.json
-```
-
-위의 명령어를 입력하여 파일을 열고, 다음과 같이 use_authenticator를 true로 변경합니다. 그리고 해당 인증 에이전트인 funapi-authenticator의 ip주소와 port번호를 각각 입력해줍니다. 여기서, `remote_authenticator_port`는 **/usr/share/funapi-authenticator/manifests/src/MANIFEST.json파일**의 `tcp_listen_port`와 같은 값이여야 합니다.
-
-```json
-...
-"AuthenticationClient": {
-  "use_authenticator" : true,
-  "remote_authenticator_ip_address" : "127.0.0.1",
-  "remote_authenticator_port" : 12800
-}
-...
-```
-
-설정이 모두 완료된 후에는 다음 명령어를 통해 실행합니다.
-
-```bash
-$ sudo service funapi-authenticator start
 ```
 
 #### funapi-leaderboard 설치
