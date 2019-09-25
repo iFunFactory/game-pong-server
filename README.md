@@ -5,7 +5,6 @@
 * 권장 운영체제 Ubuntu 16.04
 * mysql 혹은 mariadb
 * zookeeper
-* funapi-authenticator
 * funapi-leaderboard
 
 **해당 문서에서는 Ubuntu 16.04에서 설정하는 방법을 서술합니다.**
@@ -35,7 +34,7 @@ git clone https://github.com/iFunFactory/game-pong-server.git
 
 ## 서버 환경 설정
 
-Pong-server를 구동하기 위해 `mysql`, `zookeeper`, `funapi-authenticator`, `funapi-leaderboard`의 설치, 환경설정이 필요합니다. 각 개발환경 설정에 대한 자세한 내용은 [튜토리얼](https://www.ifunfactory.com/engine/documents/tutorial/ko/project.html#object-relational-mapping-db)과 [메뉴얼](https://www.ifunfactory.com/engine/documents/reference/ko/development-environment.html)을 참고해 주세요.
+Pong-server를 구동하기 위해 `mysql`, `zookeeper`, `redis-server`, `funapi-leaderboard`의 설치, 환경설정이 필요합니다. 각 개발환경 설정에 대한 자세한 내용은 [튜토리얼](https://www.ifunfactory.com/engine/documents/tutorial/ko/project.html#object-relational-mapping-db)과 [메뉴얼](https://www.ifunfactory.com/engine/documents/reference/ko/development-environment.html)을 참고해 주세요.
 
 #### mysql 설치
 `mysql server`가 설치되어있지 않다면 아래의 명령어를 통해 mysql server를 설치해주세요.
@@ -47,6 +46,8 @@ $ sudo apt-get install mysql-server
 #### mysql 설치 후 환경설정
 
 ```bash
+$ sudo service mysql start
+
 $ mysql -u root -p
 
 mysql> create user 'funapi'@'localhost' identified by 'funapi';
@@ -56,8 +57,6 @@ mysql> grant all privileges on *.* to 'funapi'@'localhost';
 mysql> create database funapi;
 
 mysql> create database funapi_leaderboard;
-
-$ sudo service mysql start
 ```
 
 #### zookeeper 설치
@@ -67,9 +66,16 @@ $ sudo apt-get install zookeeper zookeeperd
 $ sudo service zookeeper start
 ```
 
+#### redis-server 설치
+
+```bash
+$ sudo apt-get install redis-server
+$ sudo service redis-server start
+```
+
 #### funapi-leaderboard 설치
 
-leaderboard 역시 authenticator와 마찬가지로 agent구조로 되어있습니다. 아래의 명령어를 이용해 설치합니다.
+leaderboard는 agent구조로 되어있습니다. 아래의 명령어를 이용해 설치합니다.
 
 ```bash
 $ sudo apt-get update
@@ -84,7 +90,7 @@ $ sudo apt-get install redis-server
 
 #### funapi-leaderboard 설치 후 환경설정
 
-리더보드 에이전트가 정상적으로 설치되었다면 `/usr/share/funapi-leaderboard/default/manifests/MANIFEST.json` 설정파일이 생성됩니다. 
+리더보드 에이전트가 정상적으로 설치되었다면 `/usr/share/funapi-leaderboard/default/manifests/MANIFEST.json` 설정파일이 생성됩니다.
 
 `MANIFEST.json` 파일을 열고, 아래와 같이 변경해주세요.
 
