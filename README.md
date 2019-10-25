@@ -232,11 +232,12 @@ iFunEngine은 빌드 후 `-local` 스크립트와 `-launcher` 스크립트를 �
 * `matchmaker server` : matchmaking 을 처리하는 서버입니다.
 * `game server` : 매칭된 클라이언트가 머무르는 서버입니다.
 
-flavor에 대한 자세한 내용은 [메뉴얼](https://www.ifunfactory.com/engine/documents/reference/ko/game-management.html#flavors)을 참고해 주세요.
+flavor에 대한 자세한 내용은 [메뉴얼](https://www.ifunfactory.com/engine/documents/reference/ko/mgmt-packaging.html#flavor)을 참고해 주세요.
 
 ## 게임 서버 실행
 
-서버를 실행하기 전에, **분산 서비스** 설정을 위해 RPC 서비스 설정이 필요합니다. 각 서버의 설정파일은 `manifest` 디렉터리 하위에 있는 lobby, matchmaker, game 디렉터리 안에 생성됩니다.
+서버를 실행하기 전에, **분산 서비스** 설정을 위해 RPC 서비스와 HardwareInfo 설정이 필요합니다.
+각 서버의 설정파일은 `manifest` 디렉터리 하위에 있는 lobby, matchmaker, game 디렉터리 안에 생성됩니다.
 먼저, `ifconfig`명령 혹은 `ip link` 명령으로 네트워크 인터페이스 이름을 확인해주세요.
 
 ```bash
@@ -252,22 +253,27 @@ $ sudo vim manifest/lobby/MANIFEST.json
 ```
 
 아래의 `rpc_nic_name` 내용을 `ifconfig`에서 확인한 네트워크 인터페이스 이름으로 변경해주세요.
+그리고 `external_ip_resolvers` 내용을 `nic:{ifconfig 에서 확인한 네트워크 인터페이스 이름}` 으로 변경해주세요.
 
 ```json
 ...
 "RpcService": {
-            "rpc_enabled": true,
-            "rpc_threads_size": 4,
-            "rpc_port": 6015,
-            "rpc_nic_name": "eth0",
-            "rpc_tags": [],
-            "rpc_message_logging_level": 0,
-            "enable_rpc_reply_checker": true
-          },
+  "rpc_enabled": true,
+  "rpc_threads_size": 4,
+  "rpc_port": 6015,
+  "rpc_nic_name": "eth0",
+  "rpc_tags": [],
+  "rpc_message_logging_level": 0,
+  "enable_rpc_reply_checker": true
+},
+...
+"HardwareInfo": {
+  "external_ip_resolvers": "aws,nic:eth0"
+},
 ...
 ```
 
-완료하셨으면, game, matchmaker 서버의 `MANIFEST.json` 파일도 동일하게 수정해주세요.
+완료하셨으면, game 서버의 `MANIFEST.json` 파일도 동일하게 수정해주세요.
 
 ```bash
 $ sudo vim manifest/game/MANIFEST.json
@@ -296,7 +302,7 @@ I0109 00:00:00.094981  9203 manifest_handler.cc:742] Starting PongServer
 
 먼저, [여기](https://github.com/iFunFactory/game-pong)에서 pong 게임 클라이언트를 다운받아주세요.
 
-다음으로, 다운받은 Pong Client 프로젝트를 실행시켜 Main씬을 로드합니다. `NetworkManager` 오브젝트 의 Server addr값을 현재 서버의 주소로 변경해주세요.
+다음으로, 다운받은 Pong Client 프로젝트를 실행시켜 Main씬을 로드합니다. `NetworkManager` 오브젝트 의 Server addr값을 현재 서버의 주소로 변경해주세요. pong 게임은 `Tcp` 또는 `Websocket` 으로 통신해야하므로 Protocol 은 `Tcp` 또는 `Websocket` 을 선택해주세요.
 
 게임을 실행시키고 **[게스트 로그인]** 혹은 **[페이스북 로그인]** 버튼을 누르면 **클라이언트**에서 **lobby 서버**로 로그인 요청을 보내게 됩니다. **lobby 서버**가 요청을 받아 정상적으로 인증되면 클라이언트를 **lobby server**로 이동시키고 클라이언트에서는 **[대전시작]** 버튼이 활성화됩니다. **lobby 서버**에서는 아래와 같은 로그인 성공 메시지를 출력함을 확인할 수 있습니다.
 
@@ -316,4 +322,4 @@ I0412 16:25:51.601130 29206 lobby_event_handlers.cc:141] Succeed to login: id=29
 I0109 00:00:00.632324  9555 event_handlers.cc:271] Failed in matchmaking. Timeout: id=4f4ccf9233f6cd83978a5bd21ad41e1e61829d81_Editor
 ```
 
-**[순위]** 버튼을 누르면 daily 랭킹을 확인할 수 있습니다. 순위는 매일 05시에 갱신됩니다.
+**[순위]** 버튼을 누르면 랭킹을 확인할 수 있습니다.
