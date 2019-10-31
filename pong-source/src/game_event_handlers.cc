@@ -139,9 +139,6 @@ void FreeUser(const Ptr<Session> &session, EncodingScheme encoding) {
   }
 
   MoveServerByTag(opponent_session, "lobby");
-
-  opponent_session->DeleteFromContext("opponent");
-  FreeUser(opponent_session, encoding);
 }
 
 }  // unnamed namesapce
@@ -237,9 +234,6 @@ void HandleResultRequest(const Ptr<Session> &session, EncodingScheme encoding) {
   // 두 플레이어를 lobby서버로 이동시킵니다.
   MoveServerByTag(opponent_session, "lobby");
   MoveServerByTag(session, "lobby");
-
-  FreeUser(opponent_session, encoding);
-  FreeUser(session, encoding);
 }
 
 

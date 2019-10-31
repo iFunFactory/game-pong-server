@@ -64,7 +64,7 @@ void OnTransportWebsocketDetached(const Ptr<Session> &session,
   string id;
   session->GetFromContext("id", &id);
   LOG_IF(INFO, not id.empty()) << "Websocket disconnected: id=" << id;
-  // 세션을 초기과 합니다.
+  // 세션을 초기화 합니다.
   FreeUser(session, encoding);
 }
 
@@ -330,7 +330,6 @@ void StartMatchmaking(const Ptr<Session> &session, EncodingScheme encoding) {
 
       // 유저를 Game 서버로 보냅니다.
       MoveServerByTag(session, "game");
-      FreeUser(session, encoding);
     } else if (result == MatchmakingClient::kMRAlreadyRequested) {
       // Matchmaking 요청을 중복으로 보냈습니다.
       LOG(INFO) << "Failed in matchmaking. Already requested: id="
