@@ -68,6 +68,8 @@ $ sudo service zookeeper start
 
 #### redis-server 설치
 
+리더보드는 캐시 처리를 위해 `Redis` 를 사용합니다. 아래 명령어를 이용하여 Redis를 설치합니다.
+
 ```bash
 $ sudo apt-get install redis-server
 $ sudo service redis-server start
@@ -75,17 +77,11 @@ $ sudo service redis-server start
 
 #### funapi-leaderboard 설치
 
-leaderboard는 agent구조로 되어있습니다. 아래의 명령어를 이용해 설치합니다.
+리더보드는 agent 구조로 되어있습니다. 아래의 명령어를 이용해 설치합니다.
 
 ```bash
 $ sudo apt-get update
 $ sudo apt-get install funapi-leaderboard1
-```
-
-또한 리더보드는 캐시 처리를 위해 `Redis` 를 사용합니다. 아래 명령어를 이용하여 Redis를 설치합니다.
-
-```bash
-$ sudo apt-get install redis-server
 ```
 
 #### funapi-leaderboard 설치 후 환경설정
