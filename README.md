@@ -234,7 +234,7 @@ flavor에 대한 자세한 내용은 [메뉴얼](https://www.ifunfactory.com/eng
 
 서버를 실행하기 전에, **분산 서비스** 설정을 위해 RPC 서비스와 HardwareInfo 설정이 필요합니다.
 각 서버의 설정파일은 `manifest` 디렉터리 하위에 있는 lobby, matchmaker, game 디렉터리 안에 생성됩니다.
-먼저, `ifconfig`명령 혹은 `ip link` 명령으로 네트워크 인터페이스 이름을 확인해주세요.
+먼저, `ifconfig`명령 혹은 `ip link` 명령으로 ip 가 할당되어 있는 네트워크 인터페이스 이름을 확인해주세요.
 
 ```bash
 $ ifconfig
@@ -249,7 +249,6 @@ $ sudo vim manifest/lobby/MANIFEST.json
 ```
 
 아래의 `rpc_nic_name` 내용을 `ifconfig`에서 확인한 네트워크 인터페이스 이름으로 변경해주세요.
-그리고 `external_ip_resolvers` 내용을 `nic:{ifconfig 에서 확인한 네트워크 인터페이스 이름}` 으로 변경해주세요.
 
 ```json
 ...
@@ -263,11 +262,23 @@ $ sudo vim manifest/lobby/MANIFEST.json
   "enable_rpc_reply_checker": true
 },
 ...
+```
+
+그리고 `HardwareInfo/external_ip_resolvers` 내용을 수정해야 합니다.
+
+네트워크 카드의 IP 주소를 읽어서 이를 클라이언트가 접속할 IP 로 취급하려면 `nic:{네트워크 카드 이름}` 을 입력해 줍니다.
+
+로드밸런서, 방화벽, 공유기 등 Network Address Translation (NAT) 기능을 수행하는 장비 뒤에 서버가 있을 경우,
+수동으로 공인 IP 와 포트 정보를 `nat:주소:프로토콜=포트:프로토콜=포트:...` 와 같이 입력합니다.
+
+```json
 "HardwareInfo": {
-  "external_ip_resolvers": "aws,nic:eth0"
+  "external_ip_resolvers": "aws,nic:eth0,nat:93.184.216.34:tcp+pbuf=8012:http+json=8018"
 },
 ...
 ```
+
+아이펀 엔진 레퍼런스 매뉴얼 [서버의 IP 주소 알아내기](https://www.ifunfactory.com/engine/documents/reference/ko/network-subsystem2.html#ip) 페이지와 [설정 상세](https://www.ifunfactory.com/engine/documents/reference/ko/manifest_details.html#hardwareinfo) 페이지에서 자세한 내용을 확인하실 수 있습니다.
 
 완료하셨으면, game 서버의 `MANIFEST.json` 파일도 동일하게 수정해주세요.
 
