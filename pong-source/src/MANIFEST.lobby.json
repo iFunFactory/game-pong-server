@@ -121,10 +121,15 @@
             "rpc_nic_name": "eth0",
             "rpc_tags": [],
             "rpc_message_logging_level": 0,
-            "enable_rpc_reply_checker": true
-          },
-          "ZookeeperClient": {
-            "zookeeper_nodes": "localhost:2181"
+            "enable_rpc_reply_checker": true,
+            "rpc_backend": "Redis",
+            "rpc_redis_hosts": [
+              {
+                "host": "127.0.0.1:6379",
+                "database": 0,
+                "auth": ""
+              }
+            ]
           },
           "HardwareInfo": {
             "external_ip_resolvers": "aws,nic:eth0,nat:93.184.216.34:tcp+pbuf=8012:http+json=8018"

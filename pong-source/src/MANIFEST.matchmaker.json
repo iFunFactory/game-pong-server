@@ -37,13 +37,18 @@
             "rpc_nic_name": "eth0",
             "rpc_tags": [],
             "rpc_message_logging_level": 0,
-            "enable_rpc_reply_checker": true
+            "enable_rpc_reply_checker": true,
+            "rpc_backend": "Redis",
+            "rpc_redis_hosts": [
+              {
+                "host": "127.0.0.1:6379",
+                "database": 0,
+                "auth": ""
+              }
+            ]
           },
           "Curl": {
             "curl_threads_size": 1
-          },
-          "ZookeeperClient": {
-            "zookeeper_nodes": "localhost:2181"
           },
           "MatchmakingServer": {
             "enable_dynamic_match": true,
